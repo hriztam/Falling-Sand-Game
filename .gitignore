@@ -1,0 +1,17 @@
+# CMake build output
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/Makefile
+
+# Compiled binaries and objects
+*.o
+*.obj
+*.out
+*.exe
+*.app
+*.dSYM/
+
+.vscode/
