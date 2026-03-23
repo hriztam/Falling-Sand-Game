@@ -9,6 +9,8 @@ const int CELL_SIZE = 4;
 const int GRID_WIDTH = WINDOW_WIDTH / CELL_SIZE;
 const int GRID_HEIGHT = WINDOW_HEIGHT / CELL_SIZE;
 
+int brushRadius = 2;
+
 enum class CellType
 {
     Empty,
@@ -32,6 +34,8 @@ int main()
 
     std::vector<CellType> grid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty);
 
+    CellType currentMaterial = CellType::Sand;
+
     while (window.isOpen())
     {
         while (const std::optional<sf::Event> event = window.pollEvent())
@@ -50,9 +54,31 @@ int main()
             int gridX = mousePos.x / CELL_SIZE;
             int gridY = mousePos.y / CELL_SIZE;
 
+            if (brushRadius < 20)
+                brushRadius++;
+
             if (inBounds(gridX, gridY))
             {
-                grid[index(gridX, gridY)] = CellType::Sand;
+                int r = brushRadius;
+                int r2 = r * r; // radius squared
+
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        // only inside circle: dx^2 + dy^2 <= r^2
+                        if (dx * dx + dy * dy > r2)
+                            continue;
+
+                        int nx = gridX + dx;
+                        int ny = gridY + dy;
+
+                        if (inBounds(nx, ny))
+                        {
+                            grid[index(nx, ny)] = currentMaterial;
+                        }
+                    }
+                }
             }
         }
 
