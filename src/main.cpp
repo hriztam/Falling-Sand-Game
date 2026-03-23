@@ -56,6 +56,37 @@ int main()
             }
         }
 
+        // Sand falling logic
+        for (int y = GRID_HEIGHT - 2; y >= 0; y--)
+        {
+            for (int x = 0; x < GRID_WIDTH; x++)
+            {
+                if (grid[index(x, y)] != CellType::Sand)
+                {
+                    continue;
+                }
+
+                // Try moving down
+                if (inBounds(x, y + 1) && grid[index(x, y + 1)] == CellType::Empty)
+                {
+                    grid[index(x, y + 1)] = CellType::Sand;
+                    grid[index(x, y)] = CellType::Empty;
+                }
+                // Try moving down-left
+                else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                {
+                    grid[index(x - 1, y + 1)] = CellType::Sand;
+                    grid[index(x, y)] = CellType::Empty;
+                }
+                // Try moving down-right
+                else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                {
+                    grid[index(x + 1, y + 1)] = CellType::Sand;
+                    grid[index(x, y)] = CellType::Empty;
+                }
+            }
+        }
+
         window.clear(sf::Color::Black);
 
         sf::RectangleShape cellShape(sf::Vector2f(static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)));
