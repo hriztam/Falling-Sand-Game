@@ -1,6 +1,8 @@
 #include <SFML/Graphics.hpp>
 #include <optional>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
@@ -29,6 +31,8 @@ bool inBounds(int x, int y)
 
 int main()
 {
+    std::srand(static_cast<unsigned>(std::time(nullptr)));
+
     sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Falling Sand");
     window.setFramerateLimit(60);
 
@@ -53,9 +57,6 @@ int main()
 
             int gridX = mousePos.x / CELL_SIZE;
             int gridY = mousePos.y / CELL_SIZE;
-
-            if (brushRadius < 20)
-                brushRadius++;
 
             if (inBounds(gridX, gridY))
             {
@@ -92,23 +93,36 @@ int main()
                     continue;
                 }
 
-                // Try moving down
                 if (inBounds(x, y + 1) && grid[index(x, y + 1)] == CellType::Empty)
                 {
-                    grid[index(x, y + 1)] = CellType::Sand;
-                    grid[index(x, y)] = CellType::Empty;
+                    std::swap(grid[index(x, y)], grid[index(x, y + 1)]);
                 }
-                // Try moving down-left
-                else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                else
                 {
-                    grid[index(x - 1, y + 1)] = CellType::Sand;
-                    grid[index(x, y)] = CellType::Empty;
-                }
-                // Try moving down-right
-                else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
-                {
-                    grid[index(x + 1, y + 1)] = CellType::Sand;
-                    grid[index(x, y)] = CellType::Empty;
+                    bool tryLeftFirst = (std::rand() % 2 == 0);
+
+                    if (tryLeftFirst)
+                    {
+                        if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        {
+                            std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
+                        }
+                        else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        {
+                            std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
+                        }
+                    }
+                    else
+                    {
+                        if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        {
+                            std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
+                        }
+                        else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        {
+                            std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
+                        }
+                    }
                 }
             }
         }
