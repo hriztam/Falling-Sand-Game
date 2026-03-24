@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <string>
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
@@ -38,7 +39,11 @@ int main()
 
     std::vector<CellType> grid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty);
 
-    CellType currentMaterial = CellType::Sand;
+    CellType currentMaterial = CellType::Sand; // Use Empty as the eraser.
+
+    sf::RectangleShape cellShape(sf::Vector2f(static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)));
+
+    bool scanLeftToRight = true;
 
     while (window.isOpen())
     {
@@ -48,10 +53,17 @@ int main()
             {
                 window.close();
             }
+            if (event->is<sf::Event::KeyPressed>())
+            {
+                const auto &k = event->getIf<sf::Event::KeyPressed>()->code;
+                if (k == sf::Keyboard::Key::Num1)
+                    currentMaterial = CellType::Sand;
+                if (k == sf::Keyboard::Key::Num2)
+                    currentMaterial = CellType::Empty;
+            }
         }
 
-        // Paint sand with mouse
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+        auto paintBrushAtMouse = [&](CellType writeType)
         {
             sf::Vector2i mousePos = sf::Mouse::getPosition(window);
 
@@ -76,24 +88,34 @@ int main()
 
                         if (inBounds(nx, ny))
                         {
-                            grid[index(nx, ny)] = currentMaterial;
+                            grid[index(nx, ny)] = writeType;
                         }
                     }
                 }
             }
+        };
+
+        // Paint with mouse (Empty acts as the eraser).
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+        {
+            paintBrushAtMouse(currentMaterial);
         }
 
         // Sand falling logic
         for (int y = GRID_HEIGHT - 2; y >= 0; y--)
         {
-            for (int x = 0; x < GRID_WIDTH; x++)
+            const int xStart = scanLeftToRight ? 0 : (GRID_WIDTH - 1);
+            const int xEndExclusive = scanLeftToRight ? GRID_WIDTH : -1;
+            const int xStep = scanLeftToRight ? 1 : -1;
+
+            for (int x = xStart; x != xEndExclusive; x += xStep)
             {
                 if (grid[index(x, y)] != CellType::Sand)
                 {
                     continue;
                 }
 
-                if (inBounds(x, y + 1) && grid[index(x, y + 1)] == CellType::Empty)
+                if (grid[index(x, y + 1)] == CellType::Empty)
                 {
                     std::swap(grid[index(x, y)], grid[index(x, y + 1)]);
                 }
@@ -103,22 +125,22 @@ int main()
 
                     if (tryLeftFirst)
                     {
-                        if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        if (x > 0 && grid[index(x - 1, y + 1)] == CellType::Empty)
                         {
                             std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
                         }
-                        else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        else if (x + 1 < GRID_WIDTH && grid[index(x + 1, y + 1)] == CellType::Empty)
                         {
                             std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
                         }
                     }
                     else
                     {
-                        if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        if (x + 1 < GRID_WIDTH && grid[index(x + 1, y + 1)] == CellType::Empty)
                         {
                             std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
                         }
-                        else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        else if (x > 0 && grid[index(x - 1, y + 1)] == CellType::Empty)
                         {
                             std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
                         }
@@ -127,9 +149,9 @@ int main()
             }
         }
 
-        window.clear(sf::Color::Black);
+        scanLeftToRight = !scanLeftToRight;
 
-        sf::RectangleShape cellShape(sf::Vector2f(static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)));
+        window.clear(sf::Color::Black);
 
         for (int y = 0; y < GRID_HEIGHT; y++)
         {
@@ -153,6 +175,9 @@ int main()
                 window.draw(cellShape);
             }
         }
+
+        const char *materialName = (currentMaterial == CellType::Sand) ? "Sand" : "Eraser";
+        window.setTitle(std::string("Falling Sand - Tool: ") + materialName + " (1=Sand, 2=Eraser)");
 
         window.display();
     }
