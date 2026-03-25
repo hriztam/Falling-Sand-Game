@@ -17,7 +17,8 @@ int brushRadius = 2;
 enum class CellType
 {
     Empty,
-    Sand
+    Sand,
+    Wall
 };
 
 int index(int x, int y)
@@ -59,6 +60,8 @@ int main()
                 if (k == sf::Keyboard::Key::Num1)
                     currentMaterial = CellType::Sand;
                 if (k == sf::Keyboard::Key::Num2)
+                    currentMaterial = CellType::Wall;
+                if (k == sf::Keyboard::Key::Num3)
                     currentMaterial = CellType::Empty;
             }
         }
@@ -73,16 +76,11 @@ int main()
             if (inBounds(gridX, gridY))
             {
                 int r = brushRadius;
-                int r2 = r * r; // radius squared
 
                 for (int dy = -r; dy <= r; dy++)
                 {
                     for (int dx = -r; dx <= r; dx++)
                     {
-                        // only inside circle: dx^2 + dy^2 <= r^2
-                        if (dx * dx + dy * dy > r2)
-                            continue;
-
                         int nx = gridX + dx;
                         int ny = gridY + dy;
 
@@ -167,6 +165,10 @@ int main()
                 if (cell == CellType::Sand)
                 {
                     cellShape.setFillColor(sf::Color::Yellow);
+                }
+                if (cell == CellType::Wall)
+                {
+                    cellShape.setFillColor(sf::Color(120, 120, 120));
                 }
 
                 cellShape.setPosition(sf::Vector2f(
