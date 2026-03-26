@@ -18,7 +18,8 @@ enum class CellType
 {
     Empty,
     Sand,
-    Wall
+    Wall,
+    Water
 };
 
 int index(int x, int y)
@@ -40,7 +41,7 @@ int main()
 
     std::vector<CellType> grid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty);
 
-    CellType currentMaterial = CellType::Sand; // Use Empty as the eraser.
+    CellType currentMaterial = CellType::Sand;
 
     sf::RectangleShape cellShape(sf::Vector2f(static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)));
 
@@ -62,6 +63,8 @@ int main()
                 if (k == sf::Keyboard::Key::Num2)
                     currentMaterial = CellType::Wall;
                 if (k == sf::Keyboard::Key::Num3)
+                    currentMaterial = CellType::Water;
+                if (k == sf::Keyboard::Key::Num0)
                     currentMaterial = CellType::Empty;
             }
         }
@@ -147,6 +150,78 @@ int main()
             }
         }
 
+        // Water movement logic
+        for (int y = GRID_HEIGHT - 2; y >= 0; y--)
+        {
+            for (int x = 0; x < GRID_WIDTH; x++)
+            {
+                if (grid[index(x, y)] != CellType::Water)
+                {
+                    continue;
+                }
+
+                // Try moving down
+                if (inBounds(x, y + 1) && grid[index(x, y + 1)] == CellType::Empty)
+                {
+                    grid[index(x, y + 1)] = CellType::Water;
+                    grid[index(x, y)] = CellType::Empty;
+                }
+                else
+                {
+                    bool tryLeftFirst = (std::rand() % 2 == 0);
+
+                    // Try diagonal down-left / down-right
+                    if (tryLeftFirst)
+                    {
+                        if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        {
+                            grid[index(x - 1, y + 1)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        {
+                            grid[index(x + 1, y + 1)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        // Try sideways
+                        else if (inBounds(x - 1, y) && grid[index(x - 1, y)] == CellType::Empty)
+                        {
+                            grid[index(x - 1, y)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        else if (inBounds(x + 1, y) && grid[index(x + 1, y)] == CellType::Empty)
+                        {
+                            grid[index(x + 1, y)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                    }
+                    else
+                    {
+                        if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
+                        {
+                            grid[index(x + 1, y + 1)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
+                        {
+                            grid[index(x - 1, y + 1)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        else if (inBounds(x + 1, y) && grid[index(x + 1, y)] == CellType::Empty)
+                        {
+                            grid[index(x + 1, y)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                        else if (inBounds(x - 1, y) && grid[index(x - 1, y)] == CellType::Empty)
+                        {
+                            grid[index(x - 1, y)] = CellType::Water;
+                            grid[index(x, y)] = CellType::Empty;
+                        }
+                    }
+                }
+            }
+        }
+
         scanLeftToRight = !scanLeftToRight;
 
         window.clear(sf::Color::Black);
@@ -166,9 +241,13 @@ int main()
                 {
                     cellShape.setFillColor(sf::Color::Yellow);
                 }
-                if (cell == CellType::Wall)
+                else if (cell == CellType::Wall)
                 {
                     cellShape.setFillColor(sf::Color(120, 120, 120));
+                }
+                else if (cell == CellType::Water)
+                {
+                    cellShape.setFillColor(sf::Color(50, 120, 255));
                 }
 
                 cellShape.setPosition(sf::Vector2f(
