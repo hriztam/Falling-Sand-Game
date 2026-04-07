@@ -5,38 +5,69 @@
 
 Simulation::Simulation()
     : m_grid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty),
+      m_nextGrid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty),
       m_scanLeftToRight(true)
 {
 }
 
 void Simulation::update()
 {
+    std::fill(m_nextGrid.begin(), m_nextGrid.end(), CellType::Empty);
+
     const int xStart = m_scanLeftToRight ? 0 : (GRID_WIDTH - 1);
     const int xEndExclusive = m_scanLeftToRight ? GRID_WIDTH : -1;
     const int xStep = m_scanLeftToRight ? 1 : -1;
 
-    for (int y = GRID_HEIGHT - 2; y >= 0; --y)
+    for (int y = GRID_HEIGHT - 1; y >= 0; --y)
     {
         for (int x = xStart; x != xEndExclusive; x += xStep)
         {
-            if (getCell(x, y) == CellType::Sand)
+            if (getCell(x, y) != CellType::Sand)
             {
-                updateSand(x, y);
+                continue;
             }
+
+            if (!isEmptyInNext(x, y))
+            {
+                continue;
+            }
+
+            updateSand(x, y);
         }
     }
 
-    for (int y = GRID_HEIGHT - 2; y >= 0; --y)
+    for (int y = GRID_HEIGHT - 1; y >= 0; --y)
     {
         for (int x = xStart; x != xEndExclusive; x += xStep)
         {
-            if (getCell(x, y) == CellType::Water)
+            if (getCell(x, y) != CellType::Water)
             {
-                updateWater(x, y);
+                continue;
             }
+
+            if (!isEmptyInNext(x, y))
+            {
+                continue;
+            }
+
+            updateWater(x, y);
         }
     }
 
+    for (int y = GRID_HEIGHT - 1; y >= 0; --y)
+    {
+        for (int x = xStart; x != xEndExclusive; x += xStep)
+        {
+            if (getCell(x, y) != CellType::Wall)
+            {
+                continue;
+            }
+
+            tryPlaceInNext(x, y, CellType::Wall);
+        }
+    }
+
+    m_grid.swap(m_nextGrid);
     m_scanLeftToRight = !m_scanLeftToRight;
 }
 
@@ -65,6 +96,7 @@ void Simulation::paint(int gridX, int gridY, int radius, CellType material)
 void Simulation::clear()
 {
     std::fill(m_grid.begin(), m_grid.end(), CellType::Empty);
+    std::fill(m_nextGrid.begin(), m_nextGrid.end(), CellType::Empty);
 }
 
 CellType Simulation::getCell(int x, int y) const
@@ -87,101 +119,151 @@ int Simulation::index(int x, int y) const
     return y * GRID_WIDTH + x;
 }
 
+bool Simulation::isEmptyInCurrent(int x, int y) const
+{
+    return getCell(x, y) == CellType::Empty;
+}
+
+bool Simulation::isWaterInCurrent(int x, int y) const
+{
+    return getCell(x, y) == CellType::Water;
+}
+
+bool Simulation::isEmptyInNext(int x, int y) const
+{
+    if (!inBounds(x, y))
+    {
+        return false;
+    }
+
+    return m_nextGrid[index(x, y)] == CellType::Empty;
+}
+
+bool Simulation::tryPlaceInNext(int x, int y, CellType material)
+{
+    if (!inBounds(x, y) || !isEmptyInNext(x, y))
+    {
+        return false;
+    }
+
+    m_nextGrid[index(x, y)] = material;
+    return true;
+}
+
+void Simulation::placeOrStay(int fromX, int fromY, int toX, int toY, CellType material)
+{
+    if (tryPlaceInNext(toX, toY, material))
+    {
+        return;
+    }
+
+    tryPlaceInNext(fromX, fromY, material);
+}
+
+bool Simulation::tryDisplaceWater(int sandX, int sandY, int waterX, int waterY)
+{
+    if (!inBounds(waterX, waterY))
+    {
+        return false;
+    }
+
+    if (!isWaterInCurrent(waterX, waterY))
+    {
+        return false;
+    }
+
+    if (!isEmptyInNext(waterX, waterY))
+    {
+        return false;
+    }
+
+    if (!isEmptyInNext(sandX, sandY))
+    {
+        return false;
+    }
+
+    m_nextGrid[index(waterX, waterY)] = CellType::Sand;
+    m_nextGrid[index(sandX, sandY)] = CellType::Water;
+    return true;
+}
+
 void Simulation::updateSand(int x, int y)
 {
-    if (getCell(x, y + 1) == CellType::Empty || getCell(x, y + 1) == CellType::Water)
+    if (isEmptyInCurrent(x, y + 1))
     {
-        trySwap(x, y, x, y + 1);
+        placeOrStay(x, y, x, y + 1, CellType::Sand);
+        return;
+    }
+
+    if (tryDisplaceWater(x, y, x, y + 1))
+    {
         return;
     }
 
     const bool tryLeftFirst = (std::rand() % 2 == 0);
+    const int firstDx = tryLeftFirst ? -1 : 1;
+    const int secondDx = -firstDx;
 
-    if (tryLeftFirst)
+    if (isEmptyInCurrent(x + firstDx, y + 1))
     {
-        if (getCell(x - 1, y + 1) == CellType::Empty || getCell(x - 1, y + 1) == CellType::Water)
-        {
-            trySwap(x, y, x - 1, y + 1);
-        }
-        else if (getCell(x + 1, y + 1) == CellType::Empty || getCell(x + 1, y + 1) == CellType::Water)
-        {
-            trySwap(x, y, x + 1, y + 1);
-        }
+        placeOrStay(x, y, x + firstDx, y + 1, CellType::Sand);
+        return;
     }
-    else
+
+    if (tryDisplaceWater(x, y, x + firstDx, y + 1))
     {
-        if (getCell(x + 1, y + 1) == CellType::Empty || getCell(x + 1, y + 1) == CellType::Water)
-        {
-            trySwap(x, y, x + 1, y + 1);
-        }
-        else if (getCell(x - 1, y + 1) == CellType::Empty || getCell(x - 1, y + 1) == CellType::Water)
-        {
-            trySwap(x, y, x - 1, y + 1);
-        }
+        return;
     }
+
+    if (isEmptyInCurrent(x + secondDx, y + 1))
+    {
+        placeOrStay(x, y, x + secondDx, y + 1, CellType::Sand);
+        return;
+    }
+
+    if (tryDisplaceWater(x, y, x + secondDx, y + 1))
+    {
+        return;
+    }
+
+    tryPlaceInNext(x, y, CellType::Sand);
 }
 
 void Simulation::updateWater(int x, int y)
 {
-    if (tryMoveWater(x, y, x, y + 1))
+    if (isEmptyInCurrent(x, y + 1))
     {
+        placeOrStay(x, y, x, y + 1, CellType::Water);
         return;
     }
 
     const bool tryLeftFirst = (std::rand() % 2 == 0);
+    const int firstDx = tryLeftFirst ? -1 : 1;
+    const int secondDx = -firstDx;
 
-    if (tryLeftFirst)
+    if (isEmptyInCurrent(x + firstDx, y + 1))
     {
-        if (tryMoveWater(x, y, x - 1, y + 1))
-        {
-            return;
-        }
-        if (tryMoveWater(x, y, x + 1, y + 1))
-        {
-            return;
-        }
-        if (tryMoveWater(x, y, x - 1, y))
-        {
-            return;
-        }
-        tryMoveWater(x, y, x + 1, y);
+        placeOrStay(x, y, x + firstDx, y + 1, CellType::Water);
         return;
     }
 
-    if (tryMoveWater(x, y, x + 1, y + 1))
+    if (isEmptyInCurrent(x + secondDx, y + 1))
     {
+        placeOrStay(x, y, x + secondDx, y + 1, CellType::Water);
         return;
     }
-    if (tryMoveWater(x, y, x - 1, y + 1))
+
+    if (isEmptyInCurrent(x + firstDx, y))
     {
+        placeOrStay(x, y, x + firstDx, y, CellType::Water);
         return;
     }
-    if (tryMoveWater(x, y, x + 1, y))
+
+    if (isEmptyInCurrent(x + secondDx, y))
     {
+        placeOrStay(x, y, x + secondDx, y, CellType::Water);
         return;
     }
-    tryMoveWater(x, y, x - 1, y);
-}
 
-bool Simulation::trySwap(int fromX, int fromY, int toX, int toY)
-{
-    if (!inBounds(fromX, fromY) || !inBounds(toX, toY))
-    {
-        return false;
-    }
-
-    std::swap(m_grid[index(fromX, fromY)], m_grid[index(toX, toY)]);
-    return true;
-}
-
-bool Simulation::tryMoveWater(int fromX, int fromY, int toX, int toY)
-{
-    if (!inBounds(toX, toY) || getCell(toX, toY) != CellType::Empty)
-    {
-        return false;
-    }
-
-    m_grid[index(toX, toY)] = CellType::Water;
-    m_grid[index(fromX, fromY)] = CellType::Empty;
-    return true;
+    tryPlaceInNext(x, y, CellType::Water);
 }
