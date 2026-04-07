@@ -1,36 +1,46 @@
 #include <SFML/Graphics.hpp>
 #include <optional>
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <string>
 
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
-const int CELL_SIZE = 4;
+#include "simulation.h"
+#include "types.h"
 
-const int GRID_WIDTH = WINDOW_WIDTH / CELL_SIZE;
-const int GRID_HEIGHT = WINDOW_HEIGHT / CELL_SIZE;
-
-int brushRadius = 2;
-
-enum class CellType
+namespace
 {
-    Empty,
-    Sand,
-    Wall,
-    Water
-};
-
-int index(int x, int y)
+const char *getMaterialName(CellType material)
 {
-    return y * GRID_WIDTH + x;
+    switch (material)
+    {
+    case CellType::Sand:
+        return "Sand";
+    case CellType::Wall:
+        return "Wall";
+    case CellType::Water:
+        return "Water";
+    case CellType::Empty:
+    default:
+        return "Eraser";
+    }
 }
 
-bool inBounds(int x, int y)
+sf::Color getCellColor(CellType cell)
 {
-    return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
+    switch (cell)
+    {
+    case CellType::Sand:
+        return sf::Color::Yellow;
+    case CellType::Wall:
+        return sf::Color(120, 120, 120);
+    case CellType::Water:
+        return sf::Color(50, 120, 255);
+    case CellType::Empty:
+    default:
+        return sf::Color::Black;
+    }
 }
+} // namespace
 
 int main()
 {
@@ -39,13 +49,11 @@ int main()
     sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Falling Sand");
     window.setFramerateLimit(60);
 
-    std::vector<CellType> grid(GRID_WIDTH * GRID_HEIGHT, CellType::Empty);
-
+    Simulation simulation;
     CellType currentMaterial = CellType::Sand;
+    int brushRadius = 2;
 
     sf::RectangleShape cellShape(sf::Vector2f(static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)));
-
-    bool scanLeftToRight = true;
 
     while (window.isOpen())
     {
@@ -55,9 +63,11 @@ int main()
             {
                 window.close();
             }
+
             if (event->is<sf::Event::KeyPressed>())
             {
                 const auto &k = event->getIf<sf::Event::KeyPressed>()->code;
+
                 if (k == sf::Keyboard::Key::Num1)
                     currentMaterial = CellType::Sand;
                 if (k == sf::Keyboard::Key::Num2)
@@ -66,191 +76,36 @@ int main()
                     currentMaterial = CellType::Water;
                 if (k == sf::Keyboard::Key::Num0)
                     currentMaterial = CellType::Empty;
+                if (k == sf::Keyboard::Key::C)
+                    simulation.clear();
             }
         }
 
-        auto paintBrushAtMouse = [&](CellType writeType)
-        {
-            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-
-            int gridX = mousePos.x / CELL_SIZE;
-            int gridY = mousePos.y / CELL_SIZE;
-
-            if (inBounds(gridX, gridY))
-            {
-                int r = brushRadius;
-
-                for (int dy = -r; dy <= r; dy++)
-                {
-                    for (int dx = -r; dx <= r; dx++)
-                    {
-                        int nx = gridX + dx;
-                        int ny = gridY + dy;
-
-                        if (inBounds(nx, ny))
-                        {
-                            grid[index(nx, ny)] = writeType;
-                        }
-                    }
-                }
-            }
-        };
-
-        // Paint with mouse (Empty acts as the eraser).
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
         {
-            paintBrushAtMouse(currentMaterial);
+            const sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+            const int gridX = mousePos.x / CELL_SIZE;
+            const int gridY = mousePos.y / CELL_SIZE;
+
+            simulation.paint(gridX, gridY, brushRadius, currentMaterial);
         }
 
-        const int xStart = scanLeftToRight ? 0 : (GRID_WIDTH - 1);
-        const int xEndExclusive = scanLeftToRight ? GRID_WIDTH : -1;
-        const int xStep = scanLeftToRight ? 1 : -1;
-
-        // Sand falling logic
-        for (int y = GRID_HEIGHT - 2; y >= 0; y--)
-        {
-
-            for (int x = xStart; x != xEndExclusive; x += xStep)
-            {
-                if (grid[index(x, y)] != CellType::Sand)
-                {
-                    continue;
-                }
-
-                if (grid[index(x, y + 1)] == CellType::Empty)
-                {
-                    std::swap(grid[index(x, y)], grid[index(x, y + 1)]);
-                }
-                else
-                {
-                    bool tryLeftFirst = (std::rand() % 2 == 0);
-
-                    if (tryLeftFirst)
-                    {
-                        if (x > 0 && grid[index(x - 1, y + 1)] == CellType::Empty)
-                        {
-                            std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
-                        }
-                        else if (x + 1 < GRID_WIDTH && grid[index(x + 1, y + 1)] == CellType::Empty)
-                        {
-                            std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
-                        }
-                    }
-                    else
-                    {
-                        if (x + 1 < GRID_WIDTH && grid[index(x + 1, y + 1)] == CellType::Empty)
-                        {
-                            std::swap(grid[index(x, y)], grid[index(x + 1, y + 1)]);
-                        }
-                        else if (x > 0 && grid[index(x - 1, y + 1)] == CellType::Empty)
-                        {
-                            std::swap(grid[index(x, y)], grid[index(x - 1, y + 1)]);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Water movement logic
-        for (int y = GRID_HEIGHT - 2; y >= 0; y--)
-        {
-            for (int x = xStart; x != xEndExclusive; x += xStep)
-            {
-                if (grid[index(x, y)] != CellType::Water)
-                {
-                    continue;
-                }
-
-                // Try moving down
-                if (inBounds(x, y + 1) && grid[index(x, y + 1)] == CellType::Empty)
-                {
-                    grid[index(x, y + 1)] = CellType::Water;
-                    grid[index(x, y)] = CellType::Empty;
-                }
-                else
-                {
-                    bool tryLeftFirst = (std::rand() % 2 == 0);
-
-                    // Try diagonal down-left / down-right
-                    if (tryLeftFirst)
-                    {
-                        if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
-                        {
-                            grid[index(x - 1, y + 1)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        else if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
-                        {
-                            grid[index(x + 1, y + 1)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        // Try sideways
-                        else if (inBounds(x - 1, y) && grid[index(x - 1, y)] == CellType::Empty)
-                        {
-                            grid[index(x - 1, y)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        else if (inBounds(x + 1, y) && grid[index(x + 1, y)] == CellType::Empty)
-                        {
-                            grid[index(x + 1, y)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                    }
-                    else
-                    {
-                        if (inBounds(x + 1, y + 1) && grid[index(x + 1, y + 1)] == CellType::Empty)
-                        {
-                            grid[index(x + 1, y + 1)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        else if (inBounds(x - 1, y + 1) && grid[index(x - 1, y + 1)] == CellType::Empty)
-                        {
-                            grid[index(x - 1, y + 1)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        else if (inBounds(x + 1, y) && grid[index(x + 1, y)] == CellType::Empty)
-                        {
-                            grid[index(x + 1, y)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                        else if (inBounds(x - 1, y) && grid[index(x - 1, y)] == CellType::Empty)
-                        {
-                            grid[index(x - 1, y)] = CellType::Water;
-                            grid[index(x, y)] = CellType::Empty;
-                        }
-                    }
-                }
-            }
-        }
-
-        scanLeftToRight = !scanLeftToRight;
+        simulation.update();
 
         window.clear(sf::Color::Black);
 
-        for (int y = 0; y < GRID_HEIGHT; y++)
+        for (int y = 0; y < GRID_HEIGHT; ++y)
         {
-            for (int x = 0; x < GRID_WIDTH; x++)
+            for (int x = 0; x < GRID_WIDTH; ++x)
             {
-                CellType cell = grid[index(x, y)];
+                const CellType cell = simulation.getCell(x, y);
 
                 if (cell == CellType::Empty)
                 {
                     continue;
                 }
 
-                if (cell == CellType::Sand)
-                {
-                    cellShape.setFillColor(sf::Color::Yellow);
-                }
-                else if (cell == CellType::Wall)
-                {
-                    cellShape.setFillColor(sf::Color(120, 120, 120));
-                }
-                else if (cell == CellType::Water)
-                {
-                    cellShape.setFillColor(sf::Color(50, 120, 255));
-                }
-
+                cellShape.setFillColor(getCellColor(cell));
                 cellShape.setPosition(sf::Vector2f(
                     static_cast<float>(x * CELL_SIZE),
                     static_cast<float>(y * CELL_SIZE)));
@@ -258,8 +113,9 @@ int main()
             }
         }
 
-        const char *materialName = (currentMaterial == CellType::Sand) ? "Sand" : "Eraser";
-        window.setTitle(std::string("Falling Sand - Tool: ") + materialName + " (1=Sand, 2=Eraser)");
+        window.setTitle(
+            std::string("Falling Sand - Tool: ") + getMaterialName(currentMaterial) +
+            " (1=Sand, 2=Wall, 3=Water, 0=Eraser, C=Clear)");
 
         window.display();
     }

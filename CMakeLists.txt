@@ -8,6 +8,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Find SFML
 find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 
-add_executable(app src/main.cpp)
+add_executable(app
+    src/main.cpp
+    src/simulation.cpp
+)
 
 target_link_libraries(app PRIVATE SFML::Graphics)
