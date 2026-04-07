@@ -13,7 +13,48 @@ I’m learning as I go. The closest “engine-ish” thing I’ve built is a ray
 ## Tech
 
 - Language: C++
+- Library: SFML 3
 
-## Notes / dev logs
+## Current features
 
-I plan to document the project as I build it (likely in a `dev-logs/` folder) with short write-ups on what I’m implementing and why.
+- Sand
+- Water
+- Walls
+- Eraser
+- Sand-water swapping
+
+## Project structure
+
+```text
+src/
+  main.cpp
+  simulation.h
+  simulation.cpp
+  types.h
+
+docs/
+  README.md
+  project-overview.md
+  cellular-automata.md
+  material-sand.md
+  material-water.md
+  sand-water-interaction.md
+```
+
+## Controls
+
+- `1`: Sand
+- `2`: Wall
+- `3`: Water
+- `0`: Eraser
+- `C`: Clear the grid
+- `Left Mouse`: Paint selected material
+
+## Docs
+
+- `docs/README.md`
+- `docs/project-overview.md`
+- `docs/cellular-automata.md`
+- `docs/material-sand.md`
+- `docs/material-water.md`
+- `docs/sand-water-interaction.md`
