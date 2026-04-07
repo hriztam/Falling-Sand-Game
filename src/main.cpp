@@ -102,12 +102,13 @@ int main()
             paintBrushAtMouse(currentMaterial);
         }
 
+        const int xStart = scanLeftToRight ? 0 : (GRID_WIDTH - 1);
+        const int xEndExclusive = scanLeftToRight ? GRID_WIDTH : -1;
+        const int xStep = scanLeftToRight ? 1 : -1;
+
         // Sand falling logic
         for (int y = GRID_HEIGHT - 2; y >= 0; y--)
         {
-            const int xStart = scanLeftToRight ? 0 : (GRID_WIDTH - 1);
-            const int xEndExclusive = scanLeftToRight ? GRID_WIDTH : -1;
-            const int xStep = scanLeftToRight ? 1 : -1;
 
             for (int x = xStart; x != xEndExclusive; x += xStep)
             {
@@ -153,7 +154,7 @@ int main()
         // Water movement logic
         for (int y = GRID_HEIGHT - 2; y >= 0; y--)
         {
-            for (int x = 0; x < GRID_WIDTH; x++)
+            for (int x = xStart; x != xEndExclusive; x += xStep)
             {
                 if (grid[index(x, y)] != CellType::Water)
                 {
