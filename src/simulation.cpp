@@ -27,8 +27,8 @@ bool Simulation::moveCell(int x, int y, int nx, int ny)
 // ---------------------------------------------------------------------------
 // Swap (x,y) [must be sand] with (nx,ny) [must be water].
 // Sand sinks to (nx,ny); water rises to (x,y).
-// We only mark the sand's destination — the water at (x,y) is behind the
-// scan head and won't be revisited this frame, so no mark is needed there.
+// Mark both cells so the displaced water cannot continue climbing via
+// multiple swaps in the same frame.
 // ---------------------------------------------------------------------------
 bool Simulation::swapWithWater(int x, int y, int nx, int ny)
 {
@@ -38,7 +38,7 @@ bool Simulation::swapWithWater(int x, int y, int nx, int ny)
 
     std::swap(m_grid[idx(x, y)], m_grid[idx(nx, ny)]);
     m_updated[idx(nx, ny)] = true; // sand now here — don't process again
-    // (x,y) now holds water; it's behind the scan cursor, safe to leave unmarked
+    m_updated[idx(x, y)]   = true; // displaced water waits until next frame
     return true;
 }
 
@@ -52,10 +52,8 @@ void Simulation::updateSand(int x, int y)
 
     const int d = (std::rand() % 2) ? 1 : -1;
 
-    if (moveCell(x, y, x + d, y + 1))      return;
-    if (swapWithWater(x, y, x + d, y + 1)) return;
-    if (moveCell(x, y, x - d, y + 1))      return;
-    if (swapWithWater(x, y, x - d, y + 1)) return;
+    if (moveCell(x, y, x + d, y + 1)) return;
+    if (moveCell(x, y, x - d, y + 1)) return;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,29 +70,42 @@ void Simulation::updateWater(int x, int y)
 {
     if (moveCell(x, y, x, y + 1)) return;
 
-    // Diagonal fall — prefer scan direction for smooth bias
-    const int d = m_scanLeft ? 1 : -1;
-    if (moveCell(x, y, x + d, y + 1)) return;
-    if (moveCell(x, y, x - d, y + 1)) return;
+    const int firstDir  = (std::rand() % 2) ? 1 : -1;
+    const int secondDir = -firstDir;
+    if (moveCell(x, y, x + firstDir, y + 1)) return;
+    if (moveCell(x, y, x + secondDir, y + 1)) return;
 
-    // Horizontal spread — one cell only; natural fluid feel without artifacts
-    if (moveCell(x, y, x + d, y)) return;
-    if (moveCell(x, y, x - d, y)) return;
+    auto findFlowTarget = [&](int dir) -> int {
+        int furthestSupported = x;
 
-    // Pressure: if completely trapped and sand is sitting directly above,
-    // bubble upward so sand can eventually sink through even a dense pile.
-    // Row y-1 hasn't been scanned yet (we go bottom-to-top), so water that
-    // moves there will be processed normally this frame — no mark needed.
-    const int ay = y - 1;
-    if (inBounds(x, ay) &&
-        m_grid[idx(x, ay)].material == Material::Sand &&
-        !m_updated[idx(x, ay)] &&
-        (std::rand() % 3 == 0)) // 33 % chance keeps bubble rate natural
-    {
-        std::swap(m_grid[idx(x, y)], m_grid[idx(x, ay)]);
-        // (x,ay) now has water — will be picked up by the scan when it reaches row ay
-        // (x,y)  now has sand  — already past our scan cursor for this row
-    }
+        for (int step = 1; step <= WATER_FLOW; ++step) {
+            const int nx = x + dir * step;
+            if (!inBounds(nx, y)) break;
+            if (m_grid[idx(nx, y)].material != Material::Empty) break;
+            if (m_updated[idx(nx, y)]) break;
+
+            furthestSupported = nx;
+
+            if (inBounds(nx, y + 1) &&
+                m_grid[idx(nx, y + 1)].material == Material::Empty &&
+                !m_updated[idx(nx, y + 1)]) {
+                return nx;
+            }
+        }
+
+        return furthestSupported;
+    };
+
+    const int firstTarget  = findFlowTarget(firstDir);
+    const int secondTarget = findFlowTarget(secondDir);
+
+    const int firstDist  = std::abs(firstTarget - x);
+    const int secondDist = std::abs(secondTarget - x);
+
+    if (firstDist > 0 && firstDist >= secondDist && moveCell(x, y, firstTarget, y)) return;
+    if (secondDist > 0 && moveCell(x, y, secondTarget, y)) return;
+    if (firstDist > 0 && moveCell(x, y, firstTarget, y)) return;
+
 }
 
 // ---------------------------------------------------------------------------
