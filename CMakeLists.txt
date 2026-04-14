@@ -11,6 +11,7 @@ find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
 add_executable(app
     src/main.cpp
     src/simulation.cpp
+    src/material_registry.cpp
 )
 
 target_link_libraries(app PRIVATE SFML::Graphics)

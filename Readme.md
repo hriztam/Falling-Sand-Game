@@ -1,60 +1,81 @@
 # Falling Sand Game
 
-An experimental falling-sand simulation/game inspired by _Noita_.
+An experimental falling-sand particle simulation inspired by _Noita_, written in C++17 with SFML 3.
 
-## Why I’m building this
+Each grid cell is a particle obeying simple local rules — gravity, density, and fluid flow — and complex emergent behavior falls out naturally. The project started as a way to go deeper into simulation, performance, and systems programming, and has grown into a properly architected sandbox engine.
 
-Most of my recent work has been in web development and AI, so I’m using this project to go deeper into “core” programming: simulation, performance, and game-dev mechanics. The goal is to force myself to think more rigorously, research as needed, and apply math + CS fundamentals I don’t use every day.
+## Features
 
-## Background
+- Sand — falls, piles, sinks through water
+- Water — flows around obstacles, finds its level
+- Wall — immovable solid
+- Density-based displacement (sand sinks through water automatically by density comparison, no special-casing)
+- Shade variation per particle for visual depth
+- Live HUD (material, FPS, brush size)
+- Scroll-wheel brush resize
 
-I’m learning as I go. The closest “engine-ish” thing I’ve built is a ray tracer from scratch in C++: https://github.com/hriztam/Ray-Tracer
+## Build
 
-## Tech
+**Requirements**
 
-- Language: C++
-- Library: SFML 3
+- CMake 3.10+
+- C++17 compiler (clang++ or g++)
+- SFML 3 — `brew install sfml` on macOS
 
-## Current features
-
-- Sand
-- Water
-- Walls
-- Eraser
-- Sand-water swapping
-
-## Project structure
-
-```text
-src/
-  main.cpp
-  simulation.h
-  simulation.cpp
-  types.h
-
-docs/
-  README.md
-  project-overview.md
-  cellular-automata.md
-  material-sand.md
-  material-water.md
-  sand-water-interaction.md
+```bash
+git clone https://github.com/hriztam/Falling-Sand-Game
+cd Falling-Sand-Game
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/app
 ```
 
 ## Controls
 
-- `1`: Sand
-- `2`: Wall
-- `3`: Water
-- `0`: Eraser
-- `C`: Clear the grid
-- `Left Mouse`: Paint selected material
+| Input | Action |
+|---|---|
+| Left mouse | Paint selected material |
+| Right mouse | Erase |
+| Scroll wheel | Resize brush |
+| `1` | Sand |
+| `2` | Wall |
+| `3` | Water |
+| `0` | Eraser |
+| `C` | Clear grid |
 
-## Docs
+## Project structure
 
-- `docs/README.md`
-- `docs/project-overview.md`
-- `docs/cellular-automata.md`
-- `docs/material-sand.md`
-- `docs/material-water.md`
-- `docs/sand-water-interaction.md`
+```
+src/
+  types.h               — MaterialId, Cell, MovementModel, Trait flags, ColorRGBA
+  material_registry.h   — MaterialDef struct, MaterialRegistry class
+  material_registry.cpp — Registry implementation + built-in material definitions
+  simulation.h          — Simulation class, World view struct
+  simulation.cpp        — Update loop, movement families, helper primitives
+  main.cpp              — Window, input, pixel-buffer renderer, HUD
+
+docs/
+  architecture.md       — File layout, dependency graph, design decisions
+  simulation-model.md   — Cellular automata, update loop, movement families
+  materials.md          — MaterialDef, registry, how to add new materials
+  roadmap.md            — Development history and planned features
+```
+
+## How the architecture works
+
+The simulation is driven by a **MaterialRegistry** — a compact table of `MaterialDef` entries, each describing one material's movement model, density, spread rate, color, and optional behavior hook. The renderer and simulation loop never contain `switch` statements over material types, so adding a new material is a single registry entry with no changes elsewhere.
+
+See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
+
+## Background
+
+Most of my recent work has been in web development and AI. This project exists to force a different kind of thinking: simulation, memory layout, cache-friendly data, and emergent behavior from simple rules. Earlier projects in this space: [Ray Tracer in C++](https://github.com/hriztam/Ray-Tracer).
+
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | File structure, dependency graph, design decisions |
+| [docs/simulation-model.md](docs/simulation-model.md) | Cellular automata, update loop, movement families, helper primitives |
+| [docs/materials.md](docs/materials.md) | MaterialDef fields, built-in materials, how to add new ones |
+| [docs/roadmap.md](docs/roadmap.md) | Full development history and planned features |
