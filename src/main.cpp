@@ -11,28 +11,61 @@
 // Pixel-buffer renderer helpers
 // ---------------------------------------------------------------------------
 
+static uint8_t scaledChannel(uint8_t channel, float factor)
+{
+    return static_cast<uint8_t>(std::clamp(int(channel * factor), 0, 255));
+}
+
 // Fill the RGBA pixel buffer from the current world state.
 // One pixel per grid cell — the sf::Sprite is then scaled up by CELL_SIZE.
 static void buildPixelBuffer(const World& world,
                               const MaterialRegistry& reg,
                               std::vector<ColorRGBA>& buf)
 {
-    const int n = world.width * world.height;
-    for (int i = 0; i < n; ++i) {
-        const Cell& c = world.cells[i];
-        const MaterialDef* def = reg.get(c.material);
+    auto cellAt = [&](int x, int y) -> const Cell* {
+        if (x < 0 || x >= world.width || y < 0 || y >= world.height) return nullptr;
+        return &world.cells[y * world.width + x];
+    };
 
-        if (!def || c.material == MAT_EMPTY) {
-            buf[i] = {0, 0, 0, 255};
-            continue;
+    for (int y = 0; y < world.height; ++y) {
+        for (int x = 0; x < world.width; ++x) {
+            const int i = y * world.width + x;
+            const Cell& c = world.cells[i];
+            const MaterialDef* def = reg.get(c.material);
+
+            if (!def || c.material == MAT_EMPTY) {
+                buf[i] = {0, 0, 0, 255};
+                continue;
+            }
+
+            float factor = c.shade / 128.f;
+
+            if (def->movementModel == MovementModel::Liquid) {
+                // Liquids read better with calm fill shading and a brighter
+                // exposed surface than with powder-like per-particle noise.
+                factor = 0.98f + (static_cast<int>(c.shade) - 128) / 1024.f;
+
+                const Cell* above = cellAt(x, y - 1);
+                const Cell* left  = cellAt(x - 1, y);
+                const Cell* right = cellAt(x + 1, y);
+
+                if (!above || above->material != c.material) {
+                    factor += 0.16f;
+                }
+
+                const bool edgeExposed =
+                    (left  && left->material  == MAT_EMPTY) ||
+                    (right && right->material == MAT_EMPTY);
+                if (edgeExposed) {
+                    factor += 0.04f;
+                }
+            }
+
+            buf[i].r = scaledChannel(def->color.r, factor);
+            buf[i].g = scaledChannel(def->color.g, factor);
+            buf[i].b = scaledChannel(def->color.b, factor);
+            buf[i].a = 255;
         }
-
-        // Modulate base color by shade: shade 128 = neutral, <128 = darker, >128 = lighter.
-        const float factor = c.shade / 128.f;
-        buf[i].r = static_cast<uint8_t>(std::clamp(int(def->color.r * factor), 0, 255));
-        buf[i].g = static_cast<uint8_t>(std::clamp(int(def->color.g * factor), 0, 255));
-        buf[i].b = static_cast<uint8_t>(std::clamp(int(def->color.b * factor), 0, 255));
-        buf[i].a = 255;
     }
 }
 
@@ -133,6 +166,7 @@ int main()
                 case sf::Keyboard::Key::Num1: currentMat = MAT_SAND;  break;
                 case sf::Keyboard::Key::Num2: currentMat = MAT_WALL;  break;
                 case sf::Keyboard::Key::Num3: currentMat = MAT_WATER; break;
+                case sf::Keyboard::Key::Num4: currentMat = MAT_OIL;   break;
                 case sf::Keyboard::Key::Num0: currentMat = MAT_EMPTY; break;
                 case sf::Keyboard::Key::C:    sim.clear();             break;
                 default: break;
@@ -183,7 +217,7 @@ int main()
                 "\nFPS: " + std::to_string(static_cast<int>(fps + 0.5f)) +
                     "/" + std::to_string(TARGET_FPS) +
                 "\nBrush: " + std::to_string(brushRadius) +
-                "\nControls: 1 Sand  2 Wall  3 Water  0 Erase  C Clear  RMB Erase  Scroll Brush");
+                "\nControls: 1 Sand  2 Wall  3 Water  4 Oil  0 Erase  C Clear  RMB Erase  Scroll Brush");
 
             const sf::FloatRect bounds = hudText.getLocalBounds();
             hudPanel.setSize({bounds.size.x + 20.f, bounds.size.y + 22.f});

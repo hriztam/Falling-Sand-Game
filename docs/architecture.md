@@ -45,7 +45,7 @@ This split means you can replace SFML with SDL3 or a raw OpenGL context by rewri
 
 ### MaterialRegistry instead of a material enum
 
-The old codebase had `enum class Material { Empty, Sand, Water, Wall }` and `switch (material)` in both the renderer and the simulation. Adding any new material required changes in at least three places.
+The old codebase had `enum class Material { Empty, Sand, Water, Wall }` and `switch (material)` in both the renderer and the simulation. Adding a material like Oil required changes in at least three places.
 
 The registry replaces that with a table of `MaterialDef` entries built at startup. The simulation looks up the movement model and traits from the registry at runtime. The renderer looks up the base color. Neither contains any material-specific branching — they loop over the registry or index into it by `MaterialId`.
 
@@ -61,7 +61,7 @@ Material behavior is described by `MaterialDef` (data) and implemented by reusab
 
 The old renderer built a `sf::VertexArray` with 6 vertices per cell — 360,000 vertex structs written every frame for a 300×200 grid. The current renderer writes one `ColorRGBA` (4 bytes) per cell into a CPU buffer and uploads it with a single `sf::Texture::update()` call. That is 60,000 writes instead of 360,000, and a single GPU upload instead of one draw call per batch.
 
-The pixel buffer is also backend-agnostic: `ColorRGBA` is a plain struct with no SFML dependency, so switching to SDL3 or OpenGL requires only changing the upload call.
+The pixel buffer is also backend-agnostic: `ColorRGBA` is a plain struct with no SFML dependency, so switching to SDL3 or OpenGL requires only changing the upload call. The renderer now applies material-aware shading as well: powders keep stronger per-particle variation, while liquids use calmer fill shading plus a subtle surface highlight.
 
 ### `std::vector<uint8_t>` for the updated flag
 

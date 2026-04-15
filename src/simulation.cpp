@@ -151,17 +151,20 @@ void Simulation::updatePowder(int x, int y, const MaterialDef& /*def*/)
     if (tryMove(x, y, x - d, y + 1))          return;
 }
 
-// Liquid: falls, diagonal fall, then lateral spread up to def.spreadFactor cells.
-// Mirrors the old updateWater behaviour; spread limit comes from the MaterialDef
-// rather than the hard-coded WATER_FLOW constant.
+// Liquid: falls, sinks through lighter displaceable liquids by density,
+// attempts diagonal downward movement, then spreads laterally up to
+// def.spreadFactor cells.
 void Simulation::updateLiquid(int x, int y, const MaterialDef& def)
 {
-    if (tryMove(x, y, x, y + 1)) return;
+    if (tryMove(x, y, x, y + 1))              return;
+    if (tryDisplaceByDensity(x, y, x, y + 1)) return;
 
     const int firstDir  = (std::rand() % 2) ? 1 : -1;
     const int secondDir = -firstDir;
-    if (tryMove(x, y, x + firstDir,  y + 1)) return;
-    if (tryMove(x, y, x + secondDir, y + 1)) return;
+    if (tryMove(x, y, x + firstDir,  y + 1))              return;
+    if (tryDisplaceByDensity(x, y, x + firstDir,  y + 1)) return;
+    if (tryMove(x, y, x + secondDir, y + 1))              return;
+    if (tryDisplaceByDensity(x, y, x + secondDir, y + 1)) return;
 
     // Find the furthest reachable horizontal cell in a given direction.
     // Prefers positions where there is an empty cell below (liquid flows

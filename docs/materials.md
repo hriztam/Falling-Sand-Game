@@ -1,6 +1,6 @@
 # Materials
 
-This document describes the material system: what a `MaterialDef` contains, how the `MaterialRegistry` works, what the four built-in materials are, and how to add a new one.
+This document describes the material system: what a `MaterialDef` contains, how the `MaterialRegistry` works, what the built-in materials are, and how to add a new one.
 
 ## MaterialId
 
@@ -8,16 +8,17 @@ This document describes the material system: what a `MaterialDef` contains, how 
 using MaterialId = uint16_t;
 ```
 
-Every material is identified by a `uint16_t` integer. The four built-in IDs are reserved as constants:
+Every material is identified by a `uint16_t` integer. The built-in IDs are reserved as constants:
 
 ```cpp
 constexpr MaterialId MAT_EMPTY = 0;
 constexpr MaterialId MAT_SAND  = 1;
 constexpr MaterialId MAT_WATER = 2;
 constexpr MaterialId MAT_WALL  = 3;
+constexpr MaterialId MAT_OIL   = 4;
 ```
 
-Custom materials use IDs starting at 4. There is room for up to 65,535 distinct materials.
+Custom materials use IDs starting at 5. There is room for up to 65,535 distinct materials.
 
 ## MaterialDef
 
@@ -81,6 +82,7 @@ Approximate values used in the built-ins:
 | Material | Density |
 |---|---|
 | Empty | 0.0 |
+| Oil | 0.8 |
 | Water | 1.0 |
 | Sand | 1.5 |
 | Wall | 999.0 |
@@ -91,17 +93,17 @@ The maximum number of cells a Liquid or Gas particle searches horizontally each 
 
 ### shadeMin / shadeMax
 
-When a cell is painted or spawned, its `shade` field is randomised in `[shadeMin, shadeMax]`. The renderer modulates the base color by `shade / 128.0` — values below 128 darken the pixel, above 128 lighten it. This gives each particle a unique brightness without storing a full color per cell.
+When a cell is painted or spawned, its `shade` field is randomised in `[shadeMin, shadeMax]`. Granular materials use that value directly for per-particle brightness variation. Liquids use a softened version of the same shade plus a subtle surface highlight so water and oil read as continuous pools instead of noisy grains.
 
 ### color
 
-The base RGBA color rendered at shade 128 (neutral). The actual rendered color is:
+The base RGBA color rendered at shade 128 (neutral). For granular materials the rendered color is:
 
 ```
 rendered.r = clamp(color.r * (shade / 128.0), 0, 255)
 ```
 
-`ColorRGBA` is a plain struct with no SFML dependency.
+Liquids use a similar modulation but with much weaker per-cell variation and a brighter exposed surface. `ColorRGBA` is a plain struct with no SFML dependency.
 
 ### specialHook
 
@@ -122,7 +124,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, and Wall. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, and Oil. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -148,7 +150,7 @@ Sand is itself `Displaceable`, meaning a future material with density > 1.5 (lav
 - Shade: 110–140 (subtle variation)
 - Color: `{30, 120, 220}` — medium blue
 
-Water is `Displaceable` with density 1.0, so sand (density 1.5) automatically sinks through it via `tryDisplaceByDensity`.
+Water is `Displaceable` with density 1.0, so denser materials automatically sink through it via `tryDisplaceByDensity`. That includes sand (density 1.5) and any future liquid denser than water.
 
 ### Wall (3)
 
@@ -160,48 +162,28 @@ Water is `Displaceable` with density 1.0, so sand (density 1.5) automatically si
 
 Nothing has a density high enough to displace a wall.
 
+### Oil (4)
+
+- Movement: `Liquid` — falls and spreads laterally, but more slowly than water
+- Traits: `Movable | AffectedByGravity | Displaceable | LiquidLike | Flammable`
+- Density: 0.8
+- Shade: 40–60
+- Color: `{70, 50, 15}` — dark brown
+
+Oil is lighter than water, so water automatically sinks below it. Sand is denser than both, so it sinks through oil as well.
+
 ## Adding a new material
 
 The entire change is one `registerMaterial()` call in `src/material_registry.cpp:buildDefaults()`. No changes to the simulation, renderer, or main loop.
 
-**Example: Oil**
-
-Oil floats on water (lower density), flows slowly (smaller spread factor), and will be flammable in the future.
+**Example: Smoke**
 
 ```cpp
-// In MaterialRegistry::buildDefaults(), after Wall:
+// In MaterialRegistry::buildDefaults(), after the existing built-ins:
 
 {
     MaterialDef d;
-    d.id            = 4;          // MAT_OIL — add constexpr to types.h if referenced elsewhere
-    d.name          = "Oil";
-    d.movementModel = MovementModel::Liquid;
-    d.traits        = Trait::Movable | Trait::AffectedByGravity
-                    | Trait::Displaceable | Trait::LiquidLike | Trait::Flammable;
-    d.density       = 0.8f;       // lighter than water — floats on top
-    d.spreadFactor  = 3;          // spreads more slowly than water
-    d.shadeMin      = 40;
-    d.shadeMax      = 60;
-    d.color         = {70, 50, 15, 255};
-    d.specialHook   = nullptr;    // ignition hook added later
-    reg.registerMaterial(std::move(d));
-}
-```
-
-Wire up a key binding in `main.cpp`:
-
-```cpp
-case sf::Keyboard::Key::Num4: currentMat = 4; break;
-```
-
-That's it. Because oil has `Displaceable` and `density = 0.8 < 1.0`, water will automatically sink through it. Because sand has `density = 1.5 > 0.8`, sand will automatically sink through it as well.
-
-**Example: Smoke (Gas)**
-
-```cpp
-{
-    MaterialDef d;
-    d.id            = 5;
+    d.id            = 5;          // MAT_SMOKE — add constexpr to types.h if referenced elsewhere
     d.name          = "Smoke";
     d.movementModel = MovementModel::Gas;
     d.traits        = Trait::Movable | Trait::GasLike;
@@ -213,6 +195,12 @@ That's it. Because oil has `Displaceable` and `density = 0.8 < 1.0`, water will 
     d.specialHook   = nullptr;
     reg.registerMaterial(std::move(d));
 }
+```
+
+Wire up a key binding in `main.cpp`:
+
+```cpp
+case sf::Keyboard::Key::Num5: currentMat = 5; break;
 ```
 
 Gas particles are processed in Pass 2 (top-to-bottom scan), so smoke rises correctly without any additional setup.

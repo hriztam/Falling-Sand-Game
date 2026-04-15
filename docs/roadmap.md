@@ -92,14 +92,19 @@ Major architectural overhaul implementing the design from `implementation-plan.m
 
 ---
 
+### v0.9 — Oil
+*April 2026*
+
+- Added `Oil` as a built-in registry material
+- `MovementModel::Liquid`, `density = 0.8`, `spreadFactor = 3`
+- Water now sinks through oil automatically via liquid density displacement
+- Keyboard material selection updated: `4` = Oil
+
+---
+
 ## Planned features
 
 ### Near term
-
-**Oil**
-- Liquid denser than air, lighter than water
-- Floats on water surface, sand sinks through it
-- One `registerMaterial()` call, no simulation changes
 
 **Smoke / Steam**
 - Gas material that rises

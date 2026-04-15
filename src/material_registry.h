@@ -58,8 +58,8 @@ public:
     // Full list for iteration (renderer, debug UI, etc.).
     [[nodiscard]] const std::vector<MaterialDef>& all() const { return m_defs; }
 
-    // Build the canonical set of four built-in materials:
-    // Empty (0), Sand (1), Water (2), Wall (3).
+    // Build the canonical set of built-in materials:
+    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4).
     static MaterialRegistry buildDefaults();
 
 private:

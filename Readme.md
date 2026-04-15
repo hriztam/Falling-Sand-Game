@@ -9,6 +9,7 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 - Sand — falls, piles, sinks through water
 - Water — flows around obstacles, finds its level
 - Wall — immovable solid
+- Oil — lighter than water, so it floats while sand sinks through it
 - Density-based displacement (sand sinks through water automatically by density comparison, no special-casing)
 - Shade variation per particle for visual depth
 - Live HUD (material, FPS, brush size)
@@ -40,6 +41,7 @@ cmake --build build
 | `1` | Sand |
 | `2` | Wall |
 | `3` | Water |
+| `4` | Oil |
 | `0` | Eraser |
 | `C` | Clear grid |
 

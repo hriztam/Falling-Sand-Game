@@ -139,4 +139,4 @@ sand.density (1.5) > water.density (1.0)  →  true
 
 So it calls `trySwap`, which swaps the two cells and marks both updated. Sand is now one row lower; water is one row higher. The displaced water is marked updated so it doesn't try to move again in the same frame.
 
-This generalises automatically: if you add oil with `density = 0.8` and `Displaceable`, sand and water will both sink through it in the right order without any code changes.
+This generalises automatically: oil has `density = 0.8` and `Displaceable`, so water sinks through it and sand sinks through both in the right order without any simulation code changes.
