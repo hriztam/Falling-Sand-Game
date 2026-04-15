@@ -2,6 +2,17 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <limits>
+
+namespace {
+constexpr int kMinTemperature = std::numeric_limits<int8_t>::min();
+constexpr int kMaxTemperature = std::numeric_limits<int8_t>::max();
+
+int clampTemperature(int value)
+{
+    return std::clamp(value, kMinTemperature, kMaxTemperature);
+}
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -9,6 +20,7 @@
 Simulation::Simulation(MaterialRegistry registry)
     : m_registry(std::move(registry))
     , m_grid(GRID_WIDTH * GRID_HEIGHT)
+    , m_temperatureDelta(GRID_WIDTH * GRID_HEIGHT, 0)
     , m_updated(GRID_WIDTH * GRID_HEIGHT, 0)
 {}
 
@@ -82,6 +94,27 @@ bool Simulation::tryDisplaceByDensity(int x, int y, int nx, int ny)
 
     if (!(target->traits & Trait::Displaceable)) return false;
     if (mover->density <= target->density)        return false;
+
+    return trySwap(x, y, nx, ny);
+}
+
+// Displace (nx,ny) when it holds a denser Displaceable material than (x,y).
+// This is the inverse of tryDisplaceByDensity and is used for buoyant gases
+// such as steam bubbling upward through liquids.
+bool Simulation::tryDisplaceByBuoyancy(int x, int y, int nx, int ny)
+{
+    if (!inBounds(nx, ny))      return false;
+    if (m_updated[idx(nx, ny)]) return false;
+
+    const MaterialId targetId = m_grid[idx(nx, ny)].material;
+    if (targetId == MAT_EMPTY) return false;
+
+    const MaterialDef* mover  = m_registry.get(m_grid[idx(x, y)].material);
+    const MaterialDef* target = m_registry.get(targetId);
+    if (!mover || !target) return false;
+
+    if (!(target->traits & Trait::Displaceable)) return false;
+    if (mover->density >= target->density)       return false;
 
     return trySwap(x, y, nx, ny);
 }
@@ -217,6 +250,156 @@ bool Simulation::applyInteractionRules(int x, int y, const std::vector<Interacti
     return appliedAny;
 }
 
+bool Simulation::tryApplyHeatReaction(int x, int y, const HeatReaction& reaction)
+{
+    if (!inBounds(x, y))
+        return false;
+
+    const Cell& cell = m_grid[idx(x, y)];
+    if (reaction.minTemperature && cell.temperature < *reaction.minTemperature)
+        return false;
+    if (reaction.maxTemperature && cell.temperature > *reaction.maxTemperature)
+        return false;
+    if (reaction.chancePercent < 100 && (std::rand() % 100) >= reaction.chancePercent)
+        return false;
+
+    if (reaction.selfResult)
+        spawnInto(x, y, *reaction.selfResult, false);
+    return true;
+}
+
+bool Simulation::applyHeatReactions(int x, int y, const std::vector<HeatReaction>& reactions)
+{
+    bool appliedAny = false;
+    for (const HeatReaction& reaction : reactions) {
+        if (!tryApplyHeatReaction(x, y, reaction))
+            continue;
+
+        appliedAny = true;
+        if (reaction.stopAfterApply)
+            break;
+    }
+    return appliedAny;
+}
+
+void Simulation::addTemperatureDelta(int x, int y, int delta)
+{
+    if (!inBounds(x, y) || delta == 0)
+        return;
+
+    m_temperatureDelta[idx(x, y)] += static_cast<int16_t>(delta);
+}
+
+void Simulation::updateHeat()
+{
+    static constexpr std::array<std::pair<int, int>, 4> kCardinalOffsets{{
+        { 0, -1},
+        { 1,  0},
+        { 0,  1},
+        {-1,  0},
+    }};
+
+    std::fill(m_temperatureDelta.begin(), m_temperatureDelta.end(), int16_t(0));
+
+    for (int y = 0; y < GRID_HEIGHT; ++y) {
+        for (int x = 0; x < GRID_WIDTH; ++x) {
+            const Cell& cell = m_grid[idx(x, y)];
+            if (cell.material == MAT_EMPTY)
+                continue;
+
+            const MaterialDef* def = m_registry.get(cell.material);
+            if (!def)
+                continue;
+
+            if (def->coolingRate > 0 && cell.temperature != 0) {
+                const int cooling = std::min(def->coolingRate, static_cast<uint8_t>(std::abs(static_cast<int>(cell.temperature))));
+                addTemperatureDelta(x, y, cell.temperature > 0 ? -cooling : cooling);
+            }
+
+            if (def->heatEmission > 0) {
+                for (const auto& [dx, dy] : kCardinalOffsets) {
+                    const int nx = x + dx;
+                    const int ny = y + dy;
+                    if (!inBounds(nx, ny))
+                        continue;
+                    if (m_grid[idx(nx, ny)].material == MAT_EMPTY)
+                        continue;
+                    addTemperatureDelta(nx, ny, def->heatEmission);
+                }
+            }
+
+            if (x + 1 < GRID_WIDTH) {
+                const Cell& rightCell = m_grid[idx(x + 1, y)];
+                if (rightCell.material != MAT_EMPTY) {
+                    const MaterialDef* rightDef = m_registry.get(rightCell.material);
+                    const int transferCap = rightDef
+                        ? std::min(def->heatConductivity, rightDef->heatConductivity)
+                        : 0;
+                    const int diff = static_cast<int>(cell.temperature) - static_cast<int>(rightCell.temperature);
+
+                    if (transferCap > 0 && std::abs(diff) >= 2) {
+                        const int transfer = std::min(transferCap, std::abs(diff) / 2);
+                        if (diff > 0) {
+                            addTemperatureDelta(x, y, -transfer);
+                            addTemperatureDelta(x + 1, y, transfer);
+                        } else {
+                            addTemperatureDelta(x, y, transfer);
+                            addTemperatureDelta(x + 1, y, -transfer);
+                        }
+                    }
+                }
+            }
+
+            if (y + 1 < GRID_HEIGHT) {
+                const Cell& downCell = m_grid[idx(x, y + 1)];
+                if (downCell.material != MAT_EMPTY) {
+                    const MaterialDef* downDef = m_registry.get(downCell.material);
+                    const int transferCap = downDef
+                        ? std::min(def->heatConductivity, downDef->heatConductivity)
+                        : 0;
+                    const int diff = static_cast<int>(cell.temperature) - static_cast<int>(downCell.temperature);
+
+                    if (transferCap > 0 && std::abs(diff) >= 2) {
+                        const int transfer = std::min(transferCap, std::abs(diff) / 2);
+                        if (diff > 0) {
+                            addTemperatureDelta(x, y, -transfer);
+                            addTemperatureDelta(x, y + 1, transfer);
+                        } else {
+                            addTemperatureDelta(x, y, transfer);
+                            addTemperatureDelta(x, y + 1, -transfer);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (int y = 0; y < GRID_HEIGHT; ++y) {
+        for (int x = 0; x < GRID_WIDTH; ++x) {
+            Cell& cell = m_grid[idx(x, y)];
+            if (cell.material == MAT_EMPTY)
+                continue;
+
+            const int nextTemp = clampTemperature(static_cast<int>(cell.temperature) + m_temperatureDelta[idx(x, y)]);
+            cell.temperature = static_cast<int8_t>(nextTemp);
+        }
+    }
+
+    for (int y = 0; y < GRID_HEIGHT; ++y) {
+        for (int x = 0; x < GRID_WIDTH; ++x) {
+            const Cell& cell = m_grid[idx(x, y)];
+            if (cell.material == MAT_EMPTY)
+                continue;
+
+            const MaterialDef* def = m_registry.get(cell.material);
+            if (!def || def->heatReactions.empty())
+                continue;
+
+            applyHeatReactions(x, y, def->heatReactions);
+        }
+    }
+}
+
 void Simulation::runPostMoveBehavior(int x, int y)
 {
     if (m_updated[idx(x, y)])
@@ -328,11 +511,14 @@ void Simulation::updateLiquid(int x, int y, const MaterialDef& def)
 void Simulation::updateGas(int x, int y, const MaterialDef& def)
 {
     if (tryMove(x, y, x, y - 1)) return;
+    if (tryDisplaceByBuoyancy(x, y, x, y - 1)) return;
 
     const int firstDir  = (std::rand() % 2) ? 1 : -1;
     const int secondDir = -firstDir;
     if (tryMove(x, y, x + firstDir,  y - 1)) return;
+    if (tryDisplaceByBuoyancy(x, y, x + firstDir,  y - 1)) return;
     if (tryMove(x, y, x + secondDir, y - 1)) return;
+    if (tryDisplaceByBuoyancy(x, y, x + secondDir, y - 1)) return;
 
     auto findFlowTarget = [&](int dir) -> int {
         int furthest = x;
@@ -381,6 +567,7 @@ void Simulation::updateGas(int x, int y, const MaterialDef& def)
 // ---------------------------------------------------------------------------
 void Simulation::update()
 {
+    updateHeat();
     std::fill(m_updated.begin(), m_updated.end(), uint8_t(0));
     m_scanLeft = !m_scanLeft;
 

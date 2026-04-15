@@ -24,6 +24,7 @@ constexpr MaterialId MAT_WALL  = 3;
 constexpr MaterialId MAT_OIL   = 4;
 constexpr MaterialId MAT_SMOKE = 5;
 constexpr MaterialId MAT_FIRE  = 6;
+constexpr MaterialId MAT_STEAM = 7;
 
 // ---------------------------------------------------------------------------
 // MovementModel — determines which update family handles a material.

@@ -17,7 +17,7 @@ struct World {
 // Simulation — owns the grid and registry, drives all particle physics.
 //
 // Execution order per cell:
-//   movement family  →  interaction rules  →  optional specialHook  →  finalize
+//   heat pass  →  movement family  →  interaction rules  →  optional specialHook  →  finalize
 //
 // All grid reads and writes go through the helper primitives (tryMove,
 // trySwap, tryDisplaceByDensity, spawnInto) so a later double-buffer
@@ -64,8 +64,8 @@ public:
     // without special-casing any material pair.
     bool tryDisplaceByDensity(int x, int y, int nx, int ny);
 
-    // Replace (x,y) with mat, resetting all extra fields and randomising shade
-    // from the material's shadeMin/shadeMax range.
+    // Replace (x,y) with mat using the material's default spawn state and
+    // shade range.
     void spawnInto(int x, int y, MaterialId mat);
 
     // Replace (x,y) with a fully specified cell state. Used by interaction
@@ -76,8 +76,16 @@ public:
     // cell. Returns true if any rule fired.
     bool applyInteractionRules(int x, int y, const std::vector<InteractionRule>& rules);
 
+    // Evaluate temperature-driven reactions for the current cell.
+    bool applyHeatReactions(int x, int y, const std::vector<HeatReaction>& reactions);
+
 private:
     [[nodiscard]] int idx(int x, int y) const { return y * GRID_WIDTH + x; }
+
+    void updateHeat();
+    void addTemperatureDelta(int x, int y, int delta);
+    bool tryApplyHeatReaction(int x, int y, const HeatReaction& reaction);
+    bool tryDisplaceByBuoyancy(int x, int y, int nx, int ny);
 
     // Movement families — each corresponds to a MovementModel value.
     void updatePowder(int x, int y, const MaterialDef& def);
@@ -90,6 +98,7 @@ private:
 
     MaterialRegistry    m_registry;
     std::vector<Cell>   m_grid;
+    std::vector<int16_t> m_temperatureDelta;
     std::vector<uint8_t> m_updated; // uint8_t avoids std::vector<bool> bitfield overhead
     bool                m_scanLeft = true;
 };

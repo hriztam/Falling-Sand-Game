@@ -35,11 +35,24 @@ struct Cell {
 
 `shade` is randomised from the material's `shadeMin`/`shadeMax` range when a cell is painted. It stays with the particle as it moves, giving each grain of sand or drop of water a slightly different brightness — without this, the simulation looks like a flat texture moving around.
 
-`temperature`, `life`, and `aux` give materials room for stateful behavior without changing the cell layout. Fire and Smoke already use `life`, and future systems can use the same fields for heat, growth, corrosion, or other timers.
+`temperature`, `life`, and `aux` give materials room for stateful behavior without changing the cell layout. Fire and Smoke already use `life`, and Water/Steam/Fire now actively use `temperature` for heat propagation and phase changes.
 
 ## The update loop
 
-Each frame, `Simulation::update()` runs two passes:
+Each frame, `Simulation::update()` starts with a heat pass, then runs the two movement passes.
+
+### Heat pass
+
+The heat pass runs across the full grid before movement. It does four things:
+
+1. ambient cooling toward temperature `0`
+2. heat emission into cardinal neighbors
+3. conductive temperature equalization between neighboring cells
+4. temperature-triggered `heatReactions`
+
+Because this happens before movement, a Water cell can boil into Steam and then immediately use Gas movement in the same tick.
+
+After the heat pass, `Simulation::update()` runs the movement passes:
 
 ### Pass 1 — bottom-to-top (Powder, Liquid, Static, Organic)
 
@@ -93,9 +106,9 @@ Priority order:
 
 `spreadFactor` is stored in the `MaterialDef`, not as a global constant. Water uses 6. A thicker liquid like lava would use 1 or 2.
 
-### Gas (Smoke)
+### Gas (Smoke, Steam)
 
-Mirror of Liquid with inverted vertical direction — rises instead of falls, spreads laterally, uses `spreadFactor`. Smoke is the first built-in gas material.
+Mirror of Liquid with inverted vertical direction — rises instead of falls, spreads laterally, uses `spreadFactor`. Smoke and Steam both reuse this family.
 
 ### Static (Wall)
 
@@ -110,6 +123,16 @@ Driven entirely by `specialHook` plus reusable interaction rules. No base moveme
 After movement, the simulation evaluates the current material's `interactionRules`. Each rule checks local neighbors and can transform the current cell, the neighbor, or both.
 
 This keeps contact reactions out of the hot-path control flow. The simulation does not contain code like "if fire next to oil"; it only knows how to evaluate a generic rule against neighbor cells.
+
+## Heat reactions
+
+Temperature-driven changes are handled by `heatReactions`, which are evaluated in the heat pass before movement.
+
+Current examples:
+
+- Oil ignites into Fire once it reaches its heat threshold
+- Water boils into Steam
+- Steam condenses back into Water when it cools
 
 ## UpdateContext helpers
 

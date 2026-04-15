@@ -18,9 +18,10 @@ constexpr MaterialId MAT_WALL  = 3;
 constexpr MaterialId MAT_OIL   = 4;
 constexpr MaterialId MAT_SMOKE = 5;
 constexpr MaterialId MAT_FIRE  = 6;
+constexpr MaterialId MAT_STEAM = 7;
 ```
 
-Custom materials use IDs starting at 7. There is room for up to 65,535 distinct materials.
+Custom materials use IDs starting at 8. There is room for up to 65,535 distinct materials.
 
 ## MaterialDef
 
@@ -37,7 +38,11 @@ struct MaterialDef {
     uint8_t       shadeMin;      // inclusive lower bound for per-particle shade
     uint8_t       shadeMax;      // inclusive upper bound
     ColorRGBA     color;         // base RGBA color modulated by shade at render time
+    uint8_t       coolingRate;
+    uint8_t       heatEmission;
+    uint8_t       heatConductivity;
     CellSpawnDesc spawnState;    // default state for fresh particles
+    std::vector<HeatReaction> heatReactions;
     std::vector<InteractionRule> interactionRules;
 
     // Optional hook called after movement and interaction rules.
@@ -113,6 +118,26 @@ Liquids use a similar modulation but with much weaker per-cell variation and a b
 
 `spawnState` is the default state used when the user paints a material or when code calls `spawnInto(x, y, mat)`. For simple materials it is just the material id with zeroed state. For timed materials like Smoke and Fire it also carries the default lifetime range.
 
+### coolingRate / heatEmission / heatConductivity
+
+These fields drive the shared heat pass:
+
+- `coolingRate`: how quickly the cell drifts back toward ambient temperature `0`
+- `heatEmission`: heat added to each cardinal neighbor every tick
+- `heatConductivity`: how quickly temperature equalizes with neighboring cells
+
+This keeps temperature transfer data-driven instead of burying it in per-material code.
+
+### heatReactions
+
+`heatReactions` are temperature-triggered self-transforms evaluated during the heat pass. They are the basis for phase changes and ignition thresholds.
+
+Current examples:
+
+- Water turns into Steam when it gets hot enough
+- Oil turns into Fire when heated past its ignition point
+- Steam condenses back into Water when it cools
+
 ### interactionRules
 
 `interactionRules` are reusable neighbor-triggered reactions evaluated after movement. Each rule can:
@@ -141,7 +166,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, and Fire. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, and Steam. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -166,6 +191,7 @@ Sand is itself `Displaceable`, meaning a future material with density > 1.5 (lav
 - Density: 1.0
 - Shade: 110–140 (subtle variation)
 - Color: `{30, 120, 220}` — medium blue
+- Heat reaction: can boil into Steam at high temperature
 
 Water is `Displaceable` with density 1.0, so denser materials automatically sink through it via `tryDisplaceByDensity`. That includes sand (density 1.5) and any future liquid denser than water.
 
@@ -189,6 +215,8 @@ Nothing has a density high enough to displace a wall.
 
 Oil is lighter than water, so water automatically sinks below it. Sand is denser than both, so it sinks through oil as well.
 
+With the heat system in place, Oil now ignites because it gets hot enough, not because Fire special-cases Oil directly.
+
 ### Smoke (5)
 
 - Movement: `Gas` — rises and spreads laterally
@@ -207,30 +235,46 @@ Smoke uses `spawnState` plus a small `specialHook` to count down its lifetime un
 
 Fire combines reusable contact rules with a tiny lifecycle hook:
 
-- `interactionRules`: touching Water converts Fire into Smoke; touching any `Trait::Flammable` neighbor can ignite that neighbor
+- `interactionRules`: touching Water converts Fire into Smoke
 - `specialHook`: emits smoke upward and burns down its own lifetime
+
+It also emits heat each tick, which is what now ignites nearby Oil and boils Water.
+
+### Steam (7)
+
+- Movement: `Gas`
+- Traits: `Movable | Displaceable | GasLike`
+- Density: 0.04
+- Default temperature: hot
+- Color: `{205, 205, 205}`
+
+Steam is the first real temperature-driven phase-change material:
+
+- Water can transform into Steam once heated enough
+- Steam cools over time and condenses back into Water
+- Because it is a normal `Gas` material, it reuses the same gas movement family as Smoke
 
 ## Adding a new material
 
 The entire change is one `registerMaterial()` call in `src/material_registry.cpp:buildDefaults()`. No changes to the simulation, renderer, or main loop.
 
-**Example: Steam**
+**Example: Acid**
 
 ```cpp
 // In MaterialRegistry::buildDefaults(), after the existing built-ins:
 
 {
     MaterialDef d;
-    d.id            = 7;          // MAT_STEAM
-    d.name          = "Steam";
-    d.movementModel = MovementModel::Gas;
-    d.traits        = Trait::Movable | Trait::GasLike;
-    d.density       = 0.08f;
+    d.id            = 8;          // MAT_ACID
+    d.name          = "Acid";
+    d.movementModel = MovementModel::Liquid;
+    d.traits        = Trait::Movable | Trait::AffectedByGravity | Trait::Displaceable | Trait::LiquidLike;
+    d.density       = 1.1f;
     d.spreadFactor  = 4;
-    d.shadeMin      = 160;
-    d.shadeMax      = 210;
-    d.color         = {190, 190, 190, 255};
-    d.spawnState    = CellSpawnDesc{d.id, 18, 32};
+    d.shadeMin      = 120;
+    d.shadeMax      = 160;
+    d.color         = {90, 200, 90, 255};
+    d.spawnState    = CellSpawnDesc{d.id};
     d.specialHook   = nullptr;
     reg.registerMaterial(std::move(d));
 }
@@ -239,7 +283,7 @@ The entire change is one `registerMaterial()` call in `src/material_registry.cpp
 Wire up a key binding in `main.cpp`:
 
 ```cpp
-case sf::Keyboard::Key::Num7: currentMat = 7; break;
+case sf::Keyboard::Key::Num8: currentMat = 8; break;
 ```
 
-Gas particles are processed in Pass 2 (top-to-bottom scan), so steam rises correctly without any additional setup.
+The same architecture works for non-gas materials too: acid would automatically reuse the Liquid movement family.

@@ -45,6 +45,14 @@ struct InteractionRule {
     std::optional<CellSpawnDesc>     neighborResult;
 };
 
+struct HeatReaction {
+    std::optional<int8_t>        minTemperature;
+    std::optional<int8_t>        maxTemperature;
+    uint8_t                      chancePercent = 100;
+    bool                         stopAfterApply = true;
+    std::optional<CellSpawnDesc> selfResult;
+};
+
 // ---------------------------------------------------------------------------
 // MaterialDef — complete description of one material type. Stored by value in
 // the MaterialRegistry vector. One entry covers every particle of that kind;
@@ -61,10 +69,15 @@ struct MaterialDef {
     uint8_t       shadeMin      = 128;        // inclusive lower bound for shade randomisation
     uint8_t       shadeMax      = 128;        // inclusive upper bound
     ColorRGBA     color         = {};         // base RGBA used by the renderer
+    uint8_t       coolingRate   = 0;          // how quickly temperature drifts toward ambient 0
+    uint8_t       heatEmission  = 0;          // heat added to each cardinal neighbour per tick
+    uint8_t       heatConductivity = 0;       // max heat exchanged with a neighbour per tick
     CellSpawnDesc spawnState    = {};         // default state for fresh particles of this material
+    std::vector<HeatReaction> heatReactions;
     std::vector<InteractionRule> interactionRules;
 
-    // Optional per-material hook called after movement and interaction rules.
+    // Optional per-material hook called after the heat pass, movement, and
+    // interaction rules.
     // Null means no special behaviour beyond the movement model.
     // Signature: (Simulation& sim, int x, int y)
     std::function<void(Simulation&, int, int)> specialHook;
@@ -98,7 +111,7 @@ public:
     [[nodiscard]] const std::vector<MaterialDef>& all() const { return m_defs; }
 
     // Build the canonical set of built-in materials:
-    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5), Fire (6).
+    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5), Fire (6), Steam (7).
     static MaterialRegistry buildDefaults();
 
 private:

@@ -12,8 +12,10 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 - Oil — lighter than water, so it floats while sand sinks through it
 - Smoke — rises, spreads, and dissipates over time
 - Fire — ignites flammable neighbors, emits smoke, and is extinguished by water
+- Steam — hot gas that forms from heated water and condenses as it cools
 - Density-based displacement (sand sinks through water automatically by density comparison, no special-casing)
 - Data-driven neighbor interaction rules for reusable material reactions
+- Heat propagation and temperature-driven phase changes
 - Shade variation per particle for visual depth
 - Live HUD (material, FPS, brush size)
 - Scroll-wheel brush resize
@@ -47,6 +49,7 @@ cmake --build build
 | `4` | Oil |
 | `5` | Smoke |
 | `6` | Fire |
+| `7` | Steam |
 | `0` | Eraser |
 | `C` | Clear grid |
 
@@ -70,7 +73,7 @@ docs/
 
 ## How the architecture works
 
-The simulation is driven by a **MaterialRegistry** — a compact table of `MaterialDef` entries, each describing one material's movement model, density, spread rate, color, default spawn state, reusable interaction rules, and optional behavior hook. The renderer and simulation loop never contain hardcoded material-pair logic, so adding a new material or reaction stays localized to registry data plus an optional hook for genuinely custom lifecycle logic.
+The simulation is driven by a **MaterialRegistry** — a compact table of `MaterialDef` entries, each describing one material's movement model, density, spread rate, color, thermal behavior, default spawn state, reusable interaction rules, and optional behavior hook. The renderer and simulation loop never contain hardcoded material-pair logic, so adding a new material or reaction stays localized to registry data plus an optional hook for genuinely custom lifecycle logic.
 
 See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 
