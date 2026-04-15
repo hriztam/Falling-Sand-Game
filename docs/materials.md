@@ -16,9 +16,11 @@ constexpr MaterialId MAT_SAND  = 1;
 constexpr MaterialId MAT_WATER = 2;
 constexpr MaterialId MAT_WALL  = 3;
 constexpr MaterialId MAT_OIL   = 4;
+constexpr MaterialId MAT_SMOKE = 5;
+constexpr MaterialId MAT_FIRE  = 6;
 ```
 
-Custom materials use IDs starting at 5. There is room for up to 65,535 distinct materials.
+Custom materials use IDs starting at 7. There is room for up to 65,535 distinct materials.
 
 ## MaterialDef
 
@@ -35,8 +37,10 @@ struct MaterialDef {
     uint8_t       shadeMin;      // inclusive lower bound for per-particle shade
     uint8_t       shadeMax;      // inclusive upper bound
     ColorRGBA     color;         // base RGBA color modulated by shade at render time
+    CellSpawnDesc spawnState;    // default state for fresh particles
+    std::vector<InteractionRule> interactionRules;
 
-    // Optional hook called after the movement family runs.
+    // Optional hook called after movement and interaction rules.
     // Null means the family handles everything.
     std::function<void(Simulation&, int, int)> specialHook;
 };
@@ -105,9 +109,22 @@ rendered.r = clamp(color.r * (shade / 128.0), 0, 255)
 
 Liquids use a similar modulation but with much weaker per-cell variation and a brighter exposed surface. `ColorRGBA` is a plain struct with no SFML dependency.
 
+### spawnState
+
+`spawnState` is the default state used when the user paints a material or when code calls `spawnInto(x, y, mat)`. For simple materials it is just the material id with zeroed state. For timed materials like Smoke and Fire it also carries the default lifetime range.
+
+### interactionRules
+
+`interactionRules` are reusable neighbor-triggered reactions evaluated after movement. Each rule can:
+
+- match neighbors by exact material id, trait flags, or both
+- search the 4-cardinal neighborhood or the full 8-neighbor Moore neighborhood
+- apply a probability gate
+- transform the current cell, the neighbor, or both
+
 ### specialHook
 
-A `std::function<void(Simulation&, int, int)>` called after the movement family runs. For Organic materials it is called instead of any family. Use this for behavior that cannot be expressed by the generic families: fire that spreads and burns out, plants that grow into neighbors, acid that transforms the cells it touches.
+A `std::function<void(Simulation&, int, int)>` called after movement and interaction rules. For Organic materials it is still the per-tick driver because there is no movement family. Use this for behavior that cannot be expressed as a simple contact rule: burn-down timers, smoke dissipation, plants that age over time, acid that keeps dissolving after contact.
 
 Set to `nullptr` for materials that need no special logic.
 
@@ -124,7 +141,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, and Oil. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, and Fire. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -172,26 +189,48 @@ Nothing has a density high enough to displace a wall.
 
 Oil is lighter than water, so water automatically sinks below it. Sand is denser than both, so it sinks through oil as well.
 
+### Smoke (5)
+
+- Movement: `Gas` — rises and spreads laterally
+- Traits: `Movable | Displaceable | GasLike`
+- Density: 0.05
+- Default lifetime: 20-40 ticks
+- Color: `{95, 95, 95}`
+
+Smoke uses `spawnState` plus a small `specialHook` to count down its lifetime until it dissipates.
+
+### Fire (6)
+
+- Movement: `Organic`
+- Default lifetime: 24-42 ticks
+- Color: `{255, 110, 25}`
+
+Fire combines reusable contact rules with a tiny lifecycle hook:
+
+- `interactionRules`: touching Water converts Fire into Smoke; touching any `Trait::Flammable` neighbor can ignite that neighbor
+- `specialHook`: emits smoke upward and burns down its own lifetime
+
 ## Adding a new material
 
 The entire change is one `registerMaterial()` call in `src/material_registry.cpp:buildDefaults()`. No changes to the simulation, renderer, or main loop.
 
-**Example: Smoke**
+**Example: Steam**
 
 ```cpp
 // In MaterialRegistry::buildDefaults(), after the existing built-ins:
 
 {
     MaterialDef d;
-    d.id            = 5;          // MAT_SMOKE — add constexpr to types.h if referenced elsewhere
-    d.name          = "Smoke";
+    d.id            = 7;          // MAT_STEAM
+    d.name          = "Steam";
     d.movementModel = MovementModel::Gas;
     d.traits        = Trait::Movable | Trait::GasLike;
-    d.density       = 0.1f;
+    d.density       = 0.08f;
     d.spreadFactor  = 4;
-    d.shadeMin      = 60;
-    d.shadeMax      = 90;
-    d.color         = {80, 80, 80, 255};
+    d.shadeMin      = 160;
+    d.shadeMax      = 210;
+    d.color         = {190, 190, 190, 255};
+    d.spawnState    = CellSpawnDesc{d.id, 18, 32};
     d.specialHook   = nullptr;
     reg.registerMaterial(std::move(d));
 }
@@ -200,7 +239,7 @@ The entire change is one `registerMaterial()` call in `src/material_registry.cpp
 Wire up a key binding in `main.cpp`:
 
 ```cpp
-case sf::Keyboard::Key::Num5: currentMat = 5; break;
+case sf::Keyboard::Key::Num7: currentMat = 7; break;
 ```
 
-Gas particles are processed in Pass 2 (top-to-bottom scan), so smoke rises correctly without any additional setup.
+Gas particles are processed in Pass 2 (top-to-bottom scan), so steam rises correctly without any additional setup.

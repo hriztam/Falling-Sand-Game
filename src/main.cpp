@@ -167,6 +167,8 @@ int main()
                 case sf::Keyboard::Key::Num2: currentMat = MAT_WALL;  break;
                 case sf::Keyboard::Key::Num3: currentMat = MAT_WATER; break;
                 case sf::Keyboard::Key::Num4: currentMat = MAT_OIL;   break;
+                case sf::Keyboard::Key::Num5: currentMat = MAT_SMOKE; break;
+                case sf::Keyboard::Key::Num6: currentMat = MAT_FIRE;  break;
                 case sf::Keyboard::Key::Num0: currentMat = MAT_EMPTY; break;
                 case sf::Keyboard::Key::C:    sim.clear();             break;
                 default: break;
@@ -217,7 +219,7 @@ int main()
                 "\nFPS: " + std::to_string(static_cast<int>(fps + 0.5f)) +
                     "/" + std::to_string(TARGET_FPS) +
                 "\nBrush: " + std::to_string(brushRadius) +
-                "\nControls: 1 Sand  2 Wall  3 Water  4 Oil  0 Erase  C Clear  RMB Erase  Scroll Brush");
+                "\nControls: 1 Sand  2 Wall  3 Water  4 Oil  5 Smoke  6 Fire  0 Erase  C Clear  RMB Erase  Scroll Brush");
 
             const sf::FloatRect bounds = hudText.getLocalBounds();
             hudPanel.setSize({bounds.size.x + 20.f, bounds.size.y + 22.f});

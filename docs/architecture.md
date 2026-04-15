@@ -51,11 +51,13 @@ The registry replaces that with a table of `MaterialDef` entries built at startu
 
 Adding a new material is one `registerMaterial()` call in `material_registry.cpp:buildDefaults()`.
 
+The same idea now extends to reactions as well: `MaterialDef` can carry `InteractionRule` entries that describe neighbor-driven effects. The matcher is generic — exact material id, trait flags, or both — so the simulation still does not know about material pairs like "fire + oil".
+
 ### Cell is plain data, not a polymorphic object
 
 `Cell` is an 8-byte POD struct: material id, shade, temperature, life, aux, padding. The full 300×200 grid fits in ~480 KB, well within L2 cache. There are no virtual calls, no heap allocation per particle, and no pointer chasing.
 
-Material behavior is described by `MaterialDef` (data) and implemented by reusable family functions (`updatePowder`, `updateLiquid`, `updateGas`). An optional `specialHook` in `MaterialDef` handles materials that need custom logic beyond the standard family.
+Material behavior is described by `MaterialDef` (data) and implemented by reusable family functions (`updatePowder`, `updateLiquid`, `updateGas`). Neighbor reactions are handled by generic `InteractionRule` data. An optional `specialHook` in `MaterialDef` is reserved for behavior that is truly per-tick and stateful, such as fire burnout or smoke dissipation.
 
 ### Pixel buffer instead of a vertex array
 
@@ -76,6 +78,12 @@ Falling particles (Powder, Liquid) are naturally updated bottom-to-top so a colu
 
 Both passes share the same `m_updated` bitfield, which is cleared once at the start of the frame.
 
+Within each pass, a cell goes through:
+
+1. Movement family (unless it is `Organic`)
+2. Reusable interaction rules
+3. Optional `specialHook`
+
 ### UpdateContext helpers are public
 
-`tryMove`, `trySwap`, `tryDisplaceByDensity`, and `spawnInto` are public methods on `Simulation`. This is intentional — `specialHook` lambdas stored in `MaterialDef` need to call them. The alternative (a separate context struct, or friend declarations) adds indirection for no gain at the current scale.
+`tryMove`, `trySwap`, `tryDisplaceByDensity`, `spawnInto`, and `applyInteractionRules` are public methods on `Simulation`. This is intentional — `specialHook` lambdas stored in `MaterialDef` need to call them. The alternative (a separate context struct, or friend declarations) adds indirection for no gain at the current scale.

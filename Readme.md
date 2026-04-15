@@ -10,7 +10,10 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 - Water — flows around obstacles, finds its level
 - Wall — immovable solid
 - Oil — lighter than water, so it floats while sand sinks through it
+- Smoke — rises, spreads, and dissipates over time
+- Fire — ignites flammable neighbors, emits smoke, and is extinguished by water
 - Density-based displacement (sand sinks through water automatically by density comparison, no special-casing)
+- Data-driven neighbor interaction rules for reusable material reactions
 - Shade variation per particle for visual depth
 - Live HUD (material, FPS, brush size)
 - Scroll-wheel brush resize
@@ -42,6 +45,8 @@ cmake --build build
 | `2` | Wall |
 | `3` | Water |
 | `4` | Oil |
+| `5` | Smoke |
+| `6` | Fire |
 | `0` | Eraser |
 | `C` | Clear grid |
 
@@ -65,7 +70,7 @@ docs/
 
 ## How the architecture works
 
-The simulation is driven by a **MaterialRegistry** — a compact table of `MaterialDef` entries, each describing one material's movement model, density, spread rate, color, and optional behavior hook. The renderer and simulation loop never contain `switch` statements over material types, so adding a new material is a single registry entry with no changes elsewhere.
+The simulation is driven by a **MaterialRegistry** — a compact table of `MaterialDef` entries, each describing one material's movement model, density, spread rate, color, default spawn state, reusable interaction rules, and optional behavior hook. The renderer and simulation loop never contain hardcoded material-pair logic, so adding a new material or reaction stays localized to registry data plus an optional hook for genuinely custom lifecycle logic.
 
 See [docs/architecture.md](docs/architecture.md) for the full design breakdown.
 

@@ -17,7 +17,7 @@ struct World {
 // Simulation — owns the grid and registry, drives all particle physics.
 //
 // Execution order per cell:
-//   reactions / temperature  →  movement family  →  optional specialHook  →  finalize
+//   movement family  →  interaction rules  →  optional specialHook  →  finalize
 //
 // All grid reads and writes go through the helper primitives (tryMove,
 // trySwap, tryDisplaceByDensity, spawnInto) so a later double-buffer
@@ -68,6 +68,14 @@ public:
     // from the material's shadeMin/shadeMax range.
     void spawnInto(int x, int y, MaterialId mat);
 
+    // Replace (x,y) with a fully specified cell state. Used by interaction
+    // rules and material hooks that need to set life/aux or preserve shade.
+    void spawnInto(int x, int y, const CellSpawnDesc& spawn, bool markUpdated = false);
+
+    // Evaluate a list of neighbour-driven interaction rules for the current
+    // cell. Returns true if any rule fired.
+    bool applyInteractionRules(int x, int y, const std::vector<InteractionRule>& rules);
+
 private:
     [[nodiscard]] int idx(int x, int y) const { return y * GRID_WIDTH + x; }
 
@@ -76,6 +84,9 @@ private:
     void updateLiquid(int x, int y, const MaterialDef& def);
     void updateGas   (int x, int y, const MaterialDef& def);
     // Static and Organic are handled inline in update(); no dedicated function.
+    void runPostMoveBehavior(int x, int y);
+    [[nodiscard]] bool cellMatches(int x, int y, const MaterialMatch& match) const;
+    bool tryApplyInteractionRule(int x, int y, const InteractionRule& rule);
 
     MaterialRegistry    m_registry;
     std::vector<Cell>   m_grid;

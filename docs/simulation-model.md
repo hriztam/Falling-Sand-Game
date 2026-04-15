@@ -27,15 +27,15 @@ struct Cell {
     MaterialId material    = MAT_EMPTY;  // which material this cell is
     uint8_t    shade       = 128;        // per-particle brightness variation
     int8_t     temperature = 0;          // future: heat/cold systems
-    uint8_t    life        = 0;          // future: countdown timers (fire burnout)
-    uint8_t    aux         = 0;          // future: material-specific state
+    uint8_t    life        = 0;          // countdown timers (fire, smoke, etc.)
+    uint8_t    aux         = 0;          // material-specific state
     uint8_t    _pad[2]     = {};         // explicit padding to 8 bytes
 };
 ```
 
 `shade` is randomised from the material's `shadeMin`/`shadeMax` range when a cell is painted. It stays with the particle as it moves, giving each grain of sand or drop of water a slightly different brightness — without this, the simulation looks like a flat texture moving around.
 
-`temperature`, `life`, and `aux` are reserved for future systems (fire, cryo, growth). They are carried along on every move and swap today so those systems can be added without changing the Cell layout.
+`temperature`, `life`, and `aux` give materials room for stateful behavior without changing the cell layout. Fire and Smoke already use `life`, and future systems can use the same fields for heat, growth, corrosion, or other timers.
 
 ## The update loop
 
@@ -49,7 +49,8 @@ for y = GRID_HEIGHT-1 down to 0:
         skip if m_updated[x,y]
         look up material's MovementModel
         call the appropriate family function
-        call specialHook if present and cell didn't move
+        run interaction rules if present
+        call specialHook if present and cell is still active
 ```
 
 Scanning bottom-to-top means a falling particle's destination is processed before its source. A column of sand settles in a single frame instead of cascading one cell per frame across multiple frames.
@@ -92,17 +93,23 @@ Priority order:
 
 `spreadFactor` is stored in the `MaterialDef`, not as a global constant. Water uses 6. A thicker liquid like lava would use 1 or 2.
 
-### Gas (future)
+### Gas (Smoke)
 
-Mirror of Liquid with inverted vertical direction — rises instead of falls, spreads laterally, uses `spreadFactor`. Infrastructure is in place; no gas material is registered yet.
+Mirror of Liquid with inverted vertical direction — rises instead of falls, spreads laterally, uses `spreadFactor`. Smoke is the first built-in gas material.
 
 ### Static (Wall)
 
 No movement. The family function is a no-op. `specialHook` can still fire for things like heat conduction in the future.
 
-### Organic (future)
+### Organic (Fire)
 
-Driven entirely by `specialHook`. No base movement family runs. Used for materials where the behavior cannot be described by a generic family (plants that grow into neighbors, fire that spreads and burns out).
+Driven entirely by `specialHook` plus reusable interaction rules. No base movement family runs. Used for materials where the behavior cannot be described by a generic family (plants that grow into neighbors, fire that spreads and burns out).
+
+## Interaction rules
+
+After movement, the simulation evaluates the current material's `interactionRules`. Each rule checks local neighbors and can transform the current cell, the neighbor, or both.
+
+This keeps contact reactions out of the hot-path control flow. The simulation does not contain code like "if fire next to oil"; it only knows how to evaluate a generic rule against neighbor cells.
 
 ## UpdateContext helpers
 
@@ -126,7 +133,11 @@ This is the mechanism that makes sand sink through water. It's completely data-d
 
 ### `spawnInto(x, y, mat)`
 
-Replace the cell at (x,y) with a freshly initialised instance of `mat`, randomising shade from the material's range and zeroing all extra fields. Used by `specialHook` implementations.
+Replace the cell at (x,y) with a freshly initialised instance of `mat`, using the material's `spawnState` so lifetime-bearing materials get the right default values when painted or spawned.
+
+### `spawnInto(x, y, CellSpawnDesc, markUpdated)`
+
+Lower-level variant used by interaction rules and `specialHook` code. It can set explicit life/aux/temperature values and preserve shade while a timer counts down.
 
 ## Density-based displacement in detail
 

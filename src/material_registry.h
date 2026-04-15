@@ -1,12 +1,49 @@
 #pragma once
 #include "types.h"
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
 // Forward declaration so MaterialDef can reference Simulation in specialHook
 // without creating a circular include.
 class Simulation;
+
+enum class InteractionNeighborhood : uint8_t {
+    Cardinal = 0, // up, down, left, right
+    Moore    = 1, // cardinal + diagonals
+};
+
+enum class ShadeMode : uint8_t {
+    Randomized = 0,
+    Preserve   = 1,
+    Fixed      = 2,
+};
+
+struct MaterialMatch {
+    std::optional<MaterialId> material;
+    uint16_t                  requiredTraits  = 0;
+    uint16_t                  forbiddenTraits = 0;
+};
+
+struct CellSpawnDesc {
+    MaterialId material    = MAT_EMPTY;
+    uint8_t    lifeMin     = 0;
+    uint8_t    lifeMax     = 0;
+    int8_t     temperature = 0;
+    uint8_t    aux         = 0;
+    ShadeMode  shadeMode   = ShadeMode::Randomized;
+    uint8_t    shade       = 128;
+};
+
+struct InteractionRule {
+    MaterialMatch                     neighbor;
+    InteractionNeighborhood          neighborhood  = InteractionNeighborhood::Cardinal;
+    uint8_t                          chancePercent = 100;
+    bool                             stopAfterApply = true;
+    std::optional<CellSpawnDesc>     selfResult;
+    std::optional<CellSpawnDesc>     neighborResult;
+};
 
 // ---------------------------------------------------------------------------
 // MaterialDef — complete description of one material type. Stored by value in
@@ -24,8 +61,10 @@ struct MaterialDef {
     uint8_t       shadeMin      = 128;        // inclusive lower bound for shade randomisation
     uint8_t       shadeMax      = 128;        // inclusive upper bound
     ColorRGBA     color         = {};         // base RGBA used by the renderer
+    CellSpawnDesc spawnState    = {};         // default state for fresh particles of this material
+    std::vector<InteractionRule> interactionRules;
 
-    // Optional per-material hook called after the movement family runs.
+    // Optional per-material hook called after movement and interaction rules.
     // Null means no special behaviour beyond the movement model.
     // Signature: (Simulation& sim, int x, int y)
     std::function<void(Simulation&, int, int)> specialHook;
@@ -59,7 +98,7 @@ public:
     [[nodiscard]] const std::vector<MaterialDef>& all() const { return m_defs; }
 
     // Build the canonical set of built-in materials:
-    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4).
+    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5), Fire (6).
     static MaterialRegistry buildDefaults();
 
 private:

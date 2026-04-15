@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 
 // ---------------------------------------------------------------------------
@@ -88,19 +89,152 @@ bool Simulation::tryDisplaceByDensity(int x, int y, int nx, int ny)
 // Replace the cell at (x,y) with mat, reset aux fields, randomise shade.
 void Simulation::spawnInto(int x, int y, MaterialId mat)
 {
-    if (!inBounds(x, y)) return;
-    const MaterialDef* def = m_registry.get(mat);
-    Cell& c = m_grid[idx(x, y)];
-    c.material    = mat;
-    c.temperature = 0;
-    c.life        = 0;
-    c.aux         = 0;
-    if (!def || mat == MAT_EMPTY) {
-        c.shade = 128;
-    } else {
-        const int range = int(def->shadeMax) - int(def->shadeMin) + 1;
-        c.shade = uint8_t(def->shadeMin + (range > 1 ? std::rand() % range : 0));
+    CellSpawnDesc spawn;
+    spawn.material = mat;
+
+    if (const MaterialDef* def = m_registry.get(mat)) {
+        spawn = def->spawnState;
+        spawn.material = mat;
     }
+
+    spawnInto(x, y, spawn, false);
+}
+
+void Simulation::spawnInto(int x, int y, const CellSpawnDesc& spawn, bool markUpdated)
+{
+    if (!inBounds(x, y)) return;
+    const MaterialDef* def = m_registry.get(spawn.material);
+    Cell& c = m_grid[idx(x, y)];
+
+    c.material    = spawn.material;
+    c.temperature = spawn.temperature;
+
+    const int lifeRange = int(spawn.lifeMax) - int(spawn.lifeMin) + 1;
+    c.life = uint8_t(spawn.lifeMin + (lifeRange > 1 ? std::rand() % lifeRange : 0));
+    c.aux  = spawn.aux;
+
+    switch (spawn.shadeMode) {
+    case ShadeMode::Preserve:
+        break;
+    case ShadeMode::Fixed:
+        c.shade = spawn.shade;
+        break;
+    case ShadeMode::Randomized:
+    default:
+        if (!def || spawn.material == MAT_EMPTY) {
+            c.shade = 128;
+        } else {
+            const int range = int(def->shadeMax) - int(def->shadeMin) + 1;
+            c.shade = uint8_t(def->shadeMin + (range > 1 ? std::rand() % range : 0));
+        }
+        break;
+    }
+
+    if (markUpdated)
+        m_updated[idx(x, y)] = 1;
+}
+
+bool Simulation::cellMatches(int x, int y, const MaterialMatch& match) const
+{
+    if (!inBounds(x, y))
+        return false;
+
+    const Cell& cell = m_grid[idx(x, y)];
+    if (match.material && cell.material != *match.material)
+        return false;
+
+    const MaterialDef* def = m_registry.get(cell.material);
+    if (!def)
+        return false;
+
+    if ((def->traits & match.requiredTraits) != match.requiredTraits)
+        return false;
+    if ((def->traits & match.forbiddenTraits) != 0)
+        return false;
+
+    return true;
+}
+
+bool Simulation::tryApplyInteractionRule(int x, int y, const InteractionRule& rule)
+{
+    static constexpr std::array<std::pair<int, int>, 4> kCardinalOffsets{{
+        { 0, -1},
+        { 1,  0},
+        { 0,  1},
+        {-1,  0},
+    }};
+    static constexpr std::array<std::pair<int, int>, 8> kMooreOffsets{{
+        {-1, -1},
+        { 0, -1},
+        { 1, -1},
+        {-1,  0},
+        { 1,  0},
+        {-1,  1},
+        { 0,  1},
+        { 1,  1},
+    }};
+
+    auto tryNeighbor = [&](int nx, int ny) -> bool {
+        if (!cellMatches(nx, ny, rule.neighbor))
+            return false;
+        if (rule.chancePercent < 100 && (std::rand() % 100) >= rule.chancePercent)
+            return false;
+
+        if (rule.selfResult)
+            spawnInto(x, y, *rule.selfResult, true);
+        if (rule.neighborResult)
+            spawnInto(nx, ny, *rule.neighborResult, true);
+        return true;
+    };
+
+    if (rule.neighborhood == InteractionNeighborhood::Moore) {
+        for (const auto& [dx, dy] : kMooreOffsets) {
+            if (tryNeighbor(x + dx, y + dy))
+                return true;
+        }
+        return false;
+    }
+
+    for (const auto& [dx, dy] : kCardinalOffsets) {
+        if (tryNeighbor(x + dx, y + dy))
+            return true;
+    }
+    return false;
+}
+
+bool Simulation::applyInteractionRules(int x, int y, const std::vector<InteractionRule>& rules)
+{
+    bool appliedAny = false;
+    for (const InteractionRule& rule : rules) {
+        if (tryApplyInteractionRule(x, y, rule)) {
+            appliedAny = true;
+            if (rule.stopAfterApply)
+                break;
+            if (m_updated[idx(x, y)])
+                break;
+        }
+    }
+    return appliedAny;
+}
+
+void Simulation::runPostMoveBehavior(int x, int y)
+{
+    if (m_updated[idx(x, y)])
+        return;
+
+    const MaterialDef* def = m_registry.get(m_grid[idx(x, y)].material);
+    if (!def)
+        return;
+
+    if (!def->interactionRules.empty())
+        applyInteractionRules(x, y, def->interactionRules);
+
+    if (m_updated[idx(x, y)])
+        return;
+
+    def = m_registry.get(m_grid[idx(x, y)].material);
+    if (def && def->specialHook)
+        def->specialHook(*this, x, y);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,23 +242,13 @@ void Simulation::spawnInto(int x, int y, MaterialId mat)
 // ---------------------------------------------------------------------------
 void Simulation::paint(int cx, int cy, int radius, MaterialId mat)
 {
-    const MaterialDef* def = m_registry.get(mat);
-    const int range = def ? (int(def->shadeMax) - int(def->shadeMin) + 1) : 1;
-
     for (int dy = -radius; dy <= radius; ++dy) {
         for (int dx = -radius; dx <= radius; ++dx) {
             if (dx * dx + dy * dy > radius * radius) continue;
             const int nx = cx + dx, ny = cy + dy;
             if (!inBounds(nx, ny)) continue;
 
-            Cell& c       = m_grid[idx(nx, ny)];
-            c.material    = mat;
-            c.temperature = 0;
-            c.life        = 0;
-            c.aux         = 0;
-            c.shade = (mat == MAT_EMPTY || !def)
-                ? uint8_t(128)
-                : uint8_t(def->shadeMin + (range > 1 ? std::rand() % range : 0));
+            spawnInto(nx, ny, mat);
         }
     }
 }
@@ -285,10 +409,9 @@ void Simulation::update()
                 // Immovable — no movement, but specialHook may still fire.
                 break;
             case MovementModel::Organic:
-                // Organic materials are driven entirely by their specialHook.
-                if (def->specialHook)
-                    def->specialHook(*this, x, y);
-                continue; // skip the second hook call below
+                // Organic materials skip the movement family but still go
+                // through the shared interaction + hook phase below.
+                break;
             case MovementModel::Gas:
                 // Gas is handled in Pass 2; skip here.
                 continue;
@@ -296,10 +419,7 @@ void Simulation::update()
                 break;
             }
 
-            // Post-movement specialHook for Powder / Liquid / Static.
-            // Only fires if the cell is still at (x,y) (i.e., it didn't move).
-            if (def->specialHook && !m_updated[idx(x, y)])
-                def->specialHook(*this, x, y);
+            runPostMoveBehavior(x, y);
         }
     }
 
@@ -315,9 +435,7 @@ void Simulation::update()
             if (!def || def->movementModel != MovementModel::Gas) continue;
 
             updateGas(x, y, *def);
-
-            if (def->specialHook && !m_updated[idx(x, y)])
-                def->specialHook(*this, x, y);
+            runPostMoveBehavior(x, y);
         }
     }
 }
