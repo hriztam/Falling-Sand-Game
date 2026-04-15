@@ -74,7 +74,7 @@ static void buildPixelBuffer(const World& world,
 // ---------------------------------------------------------------------------
 static bool loadHudFont(sf::Font& font)
 {
-    return font.openFromFile("/System/Library/Fonts/Supplemental/Menlo.ttc");
+    return font.openFromFile("/System/Library/Fonts/Menlo.ttc");
 }
 
 // ---------------------------------------------------------------------------
