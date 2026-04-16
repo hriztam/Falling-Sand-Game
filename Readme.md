@@ -18,6 +18,7 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 - Heat propagation and temperature-driven phase changes
 - Shade variation per particle for visual depth
 - Live HUD (material, FPS, brush size)
+- Debug/tuning layer: heat overlay, cell inspector, pause/step, reproducible test scenes
 - Scroll-wheel brush resize
 
 ## Build
@@ -52,6 +53,13 @@ cmake --build build
 | `7` | Steam |
 | `0` | Eraser |
 | `C` | Clear grid |
+| `F1` | Toggle debug HUD |
+| `F2` | Toggle heat overlay |
+| `Space` | Pause / resume simulation |
+| `N` or `.` | Single-step one tick |
+| `F5` | Load oil burn test scene |
+| `F6` | Load boiler test scene |
+| `F7` | Load condensation test scene |
 
 ## Project structure
 

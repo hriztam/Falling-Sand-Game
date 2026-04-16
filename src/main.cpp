@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include <sstream>
 #include <string>
 
 #include "simulation.h"
@@ -16,11 +17,43 @@ static uint8_t scaledChannel(uint8_t channel, float factor)
     return static_cast<uint8_t>(std::clamp(int(channel * factor), 0, 255));
 }
 
+static ColorRGBA lerpColor(const ColorRGBA& a, const ColorRGBA& b, float t)
+{
+    const float clamped = std::clamp(t, 0.f, 1.f);
+    auto lerpChannel = [&](uint8_t lhs, uint8_t rhs) -> uint8_t {
+        return static_cast<uint8_t>(lhs + (rhs - lhs) * clamped);
+    };
+
+    return {
+        lerpChannel(a.r, b.r),
+        lerpChannel(a.g, b.g),
+        lerpChannel(a.b, b.b),
+        255
+    };
+}
+
+static ColorRGBA heatOverlayColor(int8_t temperature)
+{
+    const float hotT  = std::clamp(static_cast<float>(temperature) / 100.f, 0.f, 1.f);
+    const float coldT = std::clamp(static_cast<float>(-temperature) / 100.f, 0.f, 1.f);
+
+    if (hotT > 0.f) {
+        return lerpColor({255, 120, 20, 255}, {255, 245, 210, 255}, hotT);
+    }
+
+    if (coldT > 0.f) {
+        return lerpColor({40, 120, 255, 255}, {180, 240, 255, 255}, coldT);
+    }
+
+    return {0, 0, 0, 255};
+}
+
 // Fill the RGBA pixel buffer from the current world state.
 // One pixel per grid cell — the sf::Sprite is then scaled up by CELL_SIZE.
 static void buildPixelBuffer(const World& world,
-                              const MaterialRegistry& reg,
-                              std::vector<ColorRGBA>& buf)
+                             const MaterialRegistry& reg,
+                             std::vector<ColorRGBA>& buf,
+                             bool heatOverlayEnabled)
 {
     auto cellAt = [&](int x, int y) -> const Cell* {
         if (x < 0 || x >= world.width || y < 0 || y >= world.height) return nullptr;
@@ -61,10 +94,19 @@ static void buildPixelBuffer(const World& world,
                 }
             }
 
-            buf[i].r = scaledChannel(def->color.r, factor);
-            buf[i].g = scaledChannel(def->color.g, factor);
-            buf[i].b = scaledChannel(def->color.b, factor);
-            buf[i].a = 255;
+            ColorRGBA baseColor;
+            baseColor.r = scaledChannel(def->color.r, factor);
+            baseColor.g = scaledChannel(def->color.g, factor);
+            baseColor.b = scaledChannel(def->color.b, factor);
+            baseColor.a = 255;
+
+            if (!heatOverlayEnabled || c.temperature == 0) {
+                buf[i] = baseColor;
+                continue;
+            }
+
+            const float overlayStrength = std::clamp(std::abs(static_cast<int>(c.temperature)) / 90.f, 0.2f, 0.85f);
+            buf[i] = lerpColor(baseColor, heatOverlayColor(c.temperature), overlayStrength);
         }
     }
 }
@@ -82,6 +124,13 @@ static bool loadHudFont(sf::Font& font)
 // ---------------------------------------------------------------------------
 int main()
 {
+    enum class DebugScene {
+        None = 0,
+        OilBurn,
+        Boiler,
+        Condensation,
+    };
+
     std::srand(static_cast<unsigned>(std::time(nullptr)));
 
     // Build the material registry and hand ownership to the simulation.
@@ -126,10 +175,21 @@ int main()
     brushOutline.setOutlineColor(sf::Color::White);
     brushOutline.setOutlineThickness(1.f);
 
+    sf::RectangleShape inspectCellOutline;
+    inspectCellOutline.setSize({static_cast<float>(CELL_SIZE), static_cast<float>(CELL_SIZE)});
+    inspectCellOutline.setFillColor(sf::Color::Transparent);
+    inspectCellOutline.setOutlineThickness(1.f);
+    inspectCellOutline.setOutlineColor(sf::Color(255, 255, 255, 180));
+
     // ---- Input state ---------------------------------------------------------
     MaterialId currentMat = MAT_SAND;
     int brushRadius = 3;
     sf::Vector2i prevMouse{-1, -1};
+    bool debugHudEnabled = true;
+    bool heatOverlayEnabled = false;
+    bool paused = false;
+    bool stepOnce = false;
+    DebugScene activeScene = DebugScene::None;
 
     // Interpolate the brush stroke between previous and current mouse positions
     // so fast mouse movement doesn't leave gaps.
@@ -147,6 +207,62 @@ int main()
             }
         }
         prevMouse = cur;
+    };
+
+    auto sceneName = [&](DebugScene scene) -> const char* {
+        switch (scene) {
+        case DebugScene::OilBurn:     return "Oil Burn";
+        case DebugScene::Boiler:      return "Boiler";
+        case DebugScene::Condensation:return "Condensation";
+        default:                      return "Custom";
+        }
+    };
+
+    auto loadScene = [&](DebugScene scene) {
+        sim.clear();
+        activeScene = scene;
+        currentMat = MAT_SAND;
+        prevMouse = {-1, -1};
+
+        auto placeRect = [&](int x0, int y0, int w, int h, MaterialId mat) {
+            for (int y = y0; y < y0 + h; ++y) {
+                for (int x = x0; x < x0 + w; ++x) {
+                    sim.spawnInto(x, y, mat);
+                }
+            }
+        };
+
+        switch (scene) {
+        case DebugScene::OilBurn:
+            placeRect(40, 165, 220, 6, MAT_WALL);
+            placeRect(45, 145, 95, 18, MAT_OIL);
+            placeRect(150, 125, 35, 38, MAT_WATER);
+            placeRect(90, 142, 8, 3, MAT_FIRE);
+            currentMat = MAT_FIRE;
+            break;
+
+        case DebugScene::Boiler:
+            placeRect(95, 40, 4, 120, MAT_WALL);
+            placeRect(200, 40, 4, 120, MAT_WALL);
+            placeRect(95, 160, 109, 4, MAT_WALL);
+            placeRect(99, 85, 101, 75, MAT_WATER);
+            placeRect(135, 150, 28, 5, MAT_FIRE);
+            currentMat = MAT_FIRE;
+            break;
+
+        case DebugScene::Condensation:
+            placeRect(60, 32, 4, 140, MAT_WALL);
+            placeRect(235, 32, 4, 140, MAT_WALL);
+            placeRect(60, 168, 179, 4, MAT_WALL);
+            placeRect(64, 32, 171, 4, MAT_WALL);
+            placeRect(90, 120, 120, 30, MAT_WATER);
+            placeRect(110, 46, 80, 28, MAT_STEAM);
+            currentMat = MAT_STEAM;
+            break;
+
+        default:
+            break;
+        }
     };
 
     sf::Clock fpsClock;
@@ -171,7 +287,15 @@ int main()
                 case sf::Keyboard::Key::Num6: currentMat = MAT_FIRE;  break;
                 case sf::Keyboard::Key::Num7: currentMat = MAT_STEAM; break;
                 case sf::Keyboard::Key::Num0: currentMat = MAT_EMPTY; break;
-                case sf::Keyboard::Key::C:    sim.clear();             break;
+                case sf::Keyboard::Key::C:    sim.clear(); activeScene = DebugScene::None; break;
+                case sf::Keyboard::Key::F1:   debugHudEnabled = !debugHudEnabled; break;
+                case sf::Keyboard::Key::F2:   heatOverlayEnabled = !heatOverlayEnabled; break;
+                case sf::Keyboard::Key::Space: paused = !paused; break;
+                case sf::Keyboard::Key::Period:
+                case sf::Keyboard::Key::N:    stepOnce = true; break;
+                case sf::Keyboard::Key::F5:   loadScene(DebugScene::OilBurn); break;
+                case sf::Keyboard::Key::F6:   loadScene(DebugScene::Boiler); break;
+                case sf::Keyboard::Key::F7:   loadScene(DebugScene::Condensation); break;
                 default: break;
                 }
             }
@@ -185,16 +309,20 @@ int main()
         const bool rmb = sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
 
         if (lmb || rmb) {
+            activeScene = DebugScene::None;
             stroke(sf::Mouse::getPosition(window), lmb ? currentMat : MAT_EMPTY);
         } else {
             prevMouse = {-1, -1};
         }
 
         // ---- Simulate --------------------------------------------------------
-        sim.update();
+        if (!paused || stepOnce) {
+            sim.update();
+            stepOnce = false;
+        }
 
         // ---- Build pixel buffer and upload to GPU ----------------------------
-        buildPixelBuffer(sim.world(), sim.materials(), pixelBuffer);
+        buildPixelBuffer(sim.world(), sim.materials(), pixelBuffer, heatOverlayEnabled);
         gridTexture.update(reinterpret_cast<const uint8_t*>(pixelBuffer.data()));
 
         // ---- FPS / HUD -------------------------------------------------------
@@ -211,16 +339,35 @@ int main()
         brushOutline.setPosition({brushCellX * static_cast<float>(CELL_SIZE) + CELL_SIZE * 0.5f,
                                    brushCellY * static_cast<float>(CELL_SIZE) + CELL_SIZE * 0.5f});
 
-        if (hasHudFont) {
+        inspectCellOutline.setPosition({
+            brushCellX * static_cast<float>(CELL_SIZE),
+            brushCellY * static_cast<float>(CELL_SIZE)
+        });
+
+        if (hasHudFont && debugHudEnabled) {
             const MaterialDef* matDef = sim.materials().get(currentMat);
             const char* matName = matDef ? matDef->name.c_str() : "Unknown";
+            const Cell hoveredCell = sim.getCell(brushCellX, brushCellY);
+            const MaterialDef* hoveredDef = sim.materials().get(hoveredCell.material);
+            const char* hoveredName = hoveredDef ? hoveredDef->name.c_str() : "Unknown";
 
-            hudText.setString(
-                std::string("Material: ") + matName +
-                "\nFPS: " + std::to_string(static_cast<int>(fps + 0.5f)) +
-                    "/" + std::to_string(TARGET_FPS) +
-                "\nBrush: " + std::to_string(brushRadius) +
-                "\nControls: 1 Sand  2 Wall  3 Water  4 Oil  5 Smoke  6 Fire  7 Steam  0 Erase  C Clear  RMB Erase  Scroll Brush");
+            std::ostringstream hud;
+            hud << "Material: " << matName
+                << "\nFPS: " << static_cast<int>(fps + 0.5f) << "/" << TARGET_FPS
+                << "\nBrush: " << brushRadius
+                << "\nSim: " << (paused ? "Paused" : "Running")
+                << "\nOverlay: " << (heatOverlayEnabled ? "Heat" : "Off")
+                << "\nScene: " << sceneName(activeScene)
+                << "\nCursor: (" << brushCellX << ", " << brushCellY << ")"
+                << "\nHover: " << hoveredName
+                << "\nTemp/Life/Aux: "
+                << static_cast<int>(hoveredCell.temperature) << " / "
+                << static_cast<int>(hoveredCell.life) << " / "
+                << static_cast<int>(hoveredCell.aux)
+                << "\nControls: 1 Sand 2 Wall 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 0 Erase"
+                << "\nDebug: F1 HUD  F2 Heat  Space Pause  N/. Step  F5 Oil  F6 Boiler  F7 Condense  C Clear";
+
+            hudText.setString(hud.str());
 
             const sf::FloatRect bounds = hudText.getLocalBounds();
             hudPanel.setSize({bounds.size.x + 20.f, bounds.size.y + 22.f});
@@ -230,10 +377,11 @@ int main()
         window.clear(sf::Color::Black);
         window.draw(gridSprite);
         window.draw(brushOutline);
-        if (hasHudFont) {
+        if (hasHudFont && debugHudEnabled) {
             window.draw(hudPanel);
             window.draw(hudText);
         }
+        window.draw(inspectCellOutline);
         window.display();
     }
 
