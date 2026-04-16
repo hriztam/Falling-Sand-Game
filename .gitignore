@@ -15,3 +15,6 @@
 *.dSYM/
 
 .vscode/
+
+.DS_Store
+AGENT.md
