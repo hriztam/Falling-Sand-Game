@@ -235,10 +235,10 @@ Smoke uses `spawnState` plus a small `specialHook` to count down its lifetime un
 
 Fire combines reusable contact rules with a tiny lifecycle hook:
 
-- `interactionRules`: touching Water converts Fire into Smoke
+- `interactionRules`: touching Water quenches Fire into Steam, and touching any `Flammable` neighbor can ignite it
 - `specialHook`: emits smoke upward and burns down its own lifetime
 
-It also emits heat each tick, which is what now ignites nearby Oil and boils Water.
+It also emits heat each tick, so flammables can ignite either from direct contact or from getting hot enough over time.
 
 ### Steam (7)
 

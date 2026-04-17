@@ -268,6 +268,30 @@ MaterialRegistry MaterialRegistry::buildDefaults()
             d.interactionRules.push_back(rule);
         }
 
+        // Oil keeps its denser smoke-producing fire variant when ignited by
+        // contact, while other flammables fall through to the generic rule.
+        {
+            InteractionRule rule;
+            rule.neighbor.material = MAT_OIL;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 30;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 18, 36, 100, FIRE_AUX_OIL);
+            d.interactionRules.push_back(rule);
+        }
+
+        // Any flammable neighbor can catch fire through contact instead of
+        // relying on a per-material heat threshold.
+        {
+            InteractionRule rule;
+            rule.neighbor.requiredTraits = Trait::Flammable;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 30;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 18, 36, 100);
+            d.interactionRules.push_back(rule);
+        }
+
         d.specialHook = [](Simulation &sim, int x, int y)
         {
             const Cell fire = sim.getCell(x, y);

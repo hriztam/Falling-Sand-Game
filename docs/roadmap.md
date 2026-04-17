@@ -109,11 +109,11 @@ Major architectural overhaul implementing the design from `implementation-plan.m
 **Smoke / Steam**
 - Gas material that rises
 - Gas family already in place (`MovementModel::Gas`, top-down Pass 2)
-- Steam spawned by Water+Fire interaction via `specialHook`
+- Steam spawned by Water+Fire interaction via an `interactionRule`
 
 **Fire**
 - `MovementModel::Organic`, driven by `specialHook`
-- Spreads to `Flammable` neighbors, decrements `life` each frame, transforms to Smoke when `life` reaches 0
+- Spreads to `Flammable` neighbors via `interactionRules`, decrements `life` each frame, transforms to Smoke when `life` reaches 0
 - Uses `Cell::life` and `Cell::temperature` fields already in the struct
 
 **Cryo / Ice**
