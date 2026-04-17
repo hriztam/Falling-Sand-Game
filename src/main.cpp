@@ -286,6 +286,7 @@ int main()
                 case sf::Keyboard::Key::Num5: currentMat = MAT_SMOKE; break;
                 case sf::Keyboard::Key::Num6: currentMat = MAT_FIRE;  break;
                 case sf::Keyboard::Key::Num7: currentMat = MAT_STEAM; break;
+                case sf::Keyboard::Key::Num8: currentMat = MAT_WOOD;  break;
                 case sf::Keyboard::Key::Num0: currentMat = MAT_EMPTY; break;
                 case sf::Keyboard::Key::C:    sim.clear(); activeScene = DebugScene::None; break;
                 case sf::Keyboard::Key::F1:   debugHudEnabled = !debugHudEnabled; break;
@@ -364,7 +365,7 @@ int main()
                 << static_cast<int>(hoveredCell.temperature) << " / "
                 << static_cast<int>(hoveredCell.life) << " / "
                 << static_cast<int>(hoveredCell.aux)
-                << "\nControls: 1 Sand 2 Wall 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 0 Erase"
+                << "\nControls: 1 Sand 2 Wall 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 8 Wood 0 Erase"
                 << "\nDebug: F1 HUD  F2 Heat  Space Pause  N/. Step  F5 Oil  F6 Boiler  F7 Condense  C Clear";
 
             hudText.setString(hud.str());

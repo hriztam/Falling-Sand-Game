@@ -7,6 +7,7 @@ namespace
 {
     constexpr uint8_t FIRE_AUX_NONE = 0;
     constexpr uint8_t FIRE_AUX_OIL  = 1;
+    constexpr uint8_t FIRE_AUX_WOOD = 2;
 
     CellSpawnDesc makeSpawn(MaterialId material,
                             uint8_t lifeMin = 0,
@@ -280,6 +281,16 @@ MaterialRegistry MaterialRegistry::buildDefaults()
             d.interactionRules.push_back(rule);
         }
 
+        {
+            InteractionRule rule;
+            rule.neighbor.material = MAT_WOOD;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 20;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 90, 150, 100, FIRE_AUX_WOOD);
+            d.interactionRules.push_back(rule);
+        }
+
         // Any flammable neighbor can catch fire through contact instead of
         // relying on a per-material heat threshold.
         {
@@ -298,12 +309,19 @@ MaterialRegistry MaterialRegistry::buildDefaults()
             if (fire.material != MAT_FIRE)
                 return;
 
-            if (fire.aux == FIRE_AUX_OIL &&
+            const bool isOilFire = fire.aux == FIRE_AUX_OIL;
+            const bool isWoodFire = fire.aux == FIRE_AUX_WOOD;
+
+            if ((isOilFire || isWoodFire) &&
                 sim.inBounds(x, y - 1) &&
-                sim.getCell(x, y - 1).material == MAT_EMPTY &&
-                (std::rand() % 100) < 35)
+                sim.getCell(x, y - 1).material == MAT_EMPTY)
             {
-                sim.spawnInto(x, y - 1, makeSpawn(MAT_SMOKE, 12, 24, 35), true);
+                const int smokeChance = isWoodFire ? 18 : 35;
+                if ((std::rand() % 100) < smokeChance) {
+                    const uint8_t smokeLifeMin = isWoodFire ? 18 : 12;
+                    const uint8_t smokeLifeMax = isWoodFire ? 32 : 24;
+                    sim.spawnInto(x, y - 1, makeSpawn(MAT_SMOKE, smokeLifeMin, smokeLifeMax, 35), true);
+                }
             }
 
             if (fire.life <= 1)
@@ -338,6 +356,30 @@ MaterialRegistry MaterialRegistry::buildDefaults()
                              int8_t(12),
                              makeSpawn(MAT_WATER, 0, 0, 0),
                              45));
+        d.specialHook = nullptr;
+        reg.registerMaterial(std::move(d));
+    }
+
+    // --- Wood (MAT_WOOD = 8) ---------------------------------------------
+    {
+        MaterialDef d;
+        d.id = MAT_WOOD;
+        d.name = "Wood";
+        d.movementModel = MovementModel::Static;
+        d.traits = Trait::Flammable | Trait::SolidLike | Trait::ConductsHeat;
+        d.density = 2.2f;
+        d.spreadFactor = 0;
+        d.shadeMin = 82;
+        d.shadeMax = 116;
+        d.color = {120, 78, 38, 255};
+        d.coolingRate = 1;
+        d.heatConductivity = 1;
+        d.spawnState = makeSpawn(MAT_WOOD);
+        d.heatReactions.push_back(
+            makeHeatReaction(int8_t(32),
+                             std::nullopt,
+                             makeSpawn(MAT_FIRE, 90, 150, 100, FIRE_AUX_WOOD),
+                             20));
         d.specialHook = nullptr;
         reg.registerMaterial(std::move(d));
     }

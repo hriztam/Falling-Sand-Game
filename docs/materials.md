@@ -166,7 +166,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, and Steam. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam, and Wood. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -253,6 +253,17 @@ Steam is the first real temperature-driven phase-change material:
 - Water can transform into Steam once heated enough
 - Steam cools over time and condenses back into Water
 - Because it is a normal `Gas` material, it reuses the same gas movement family as Smoke
+
+### Wood (8)
+
+- Movement: `Static`
+- Traits: `Flammable | SolidLike | ConductsHeat`
+- Density: 2.2
+- Shade: 82–116
+- Color: `{120, 78, 38}`
+- Heat reaction: can ignite into a longer-lived wood-fire state
+
+Wood is the first structural flammable. It validates the generic contact ignition rule while still using a dedicated fire variant so it burns more slowly than Oil and emits a steadier smoke plume.
 
 ## Adding a new material
 
