@@ -111,7 +111,8 @@ public:
     [[nodiscard]] const std::vector<MaterialDef>& all() const { return m_defs; }
 
     // Build the canonical set of built-in materials:
-    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5), Fire (6), Steam (7).
+    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5),
+    // Fire (6), Steam (7), Wood (8), Lava (9).
     static MaterialRegistry buildDefaults();
 
 private:

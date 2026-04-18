@@ -99,7 +99,8 @@ bool MaterialRegistry::has(MaterialId id) const
 }
 
 // ---------------------------------------------------------------------------
-// buildDefaults — registers Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam.
+// buildDefaults — registers Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam,
+// Wood, and Lava.
 // Written with explicit field assignment for C++17 compatibility
 // (designated initialisers are C++20).
 // ---------------------------------------------------------------------------
@@ -380,6 +381,72 @@ MaterialRegistry MaterialRegistry::buildDefaults()
                              std::nullopt,
                              makeSpawn(MAT_FIRE, 90, 150, 100, FIRE_AUX_WOOD),
                              20));
+        d.specialHook = nullptr;
+        reg.registerMaterial(std::move(d));
+    }
+
+    // --- Lava (MAT_LAVA = 9) ---------------------------------------------
+    {
+        MaterialDef d;
+        d.id = MAT_LAVA;
+        d.name = "Lava";
+        d.movementModel = MovementModel::Liquid;
+        d.traits = Trait::Movable | Trait::AffectedByGravity | Trait::Displaceable | Trait::LiquidLike | Trait::ConductsHeat;
+        d.density = 2.8f;
+        d.spreadFactor = 2;
+        d.shadeMin = 150;
+        d.shadeMax = 220;
+        d.color = {255, 92, 18, 255};
+        d.coolingRate = 1;
+        d.heatEmission = 18;
+        d.heatConductivity = 5;
+        d.spawnState = makeSpawn(MAT_LAVA, 0, 0, 120);
+        d.heatReactions.push_back(
+            makeHeatReaction(std::nullopt,
+                             int8_t(18),
+                             makeSpawn(MAT_WALL, 0, 0, 0),
+                             100));
+
+        {
+            InteractionRule rule;
+            rule.neighbor.material = MAT_WATER;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 100;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_STEAM, 0, 0, 95);
+            d.interactionRules.push_back(rule);
+        }
+
+        {
+            InteractionRule rule;
+            rule.neighbor.material = MAT_OIL;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 80;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 18, 36, 100, FIRE_AUX_OIL);
+            d.interactionRules.push_back(rule);
+        }
+
+        {
+            InteractionRule rule;
+            rule.neighbor.material = MAT_WOOD;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 65;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 90, 150, 100, FIRE_AUX_WOOD);
+            d.interactionRules.push_back(rule);
+        }
+
+        {
+            InteractionRule rule;
+            rule.neighbor.requiredTraits = Trait::Flammable;
+            rule.neighborhood = InteractionNeighborhood::Cardinal;
+            rule.chancePercent = 70;
+            rule.stopAfterApply = true;
+            rule.neighborResult = makeSpawn(MAT_FIRE, 18, 36, 100);
+            d.interactionRules.push_back(rule);
+        }
+
         d.specialHook = nullptr;
         reg.registerMaterial(std::move(d));
     }

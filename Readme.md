@@ -14,6 +14,7 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 - Fire — ignites flammable neighbors, emits smoke, and is extinguished by water
 - Steam — hot gas that forms from heated water and condenses as it cools
 - Wood — static flammable building material that burns slowly and gives off smoke
+- Lava — dense hot liquid that boils water into steam and cools into stone
 - Density-based displacement (sand sinks through water automatically by density comparison, no special-casing)
 - Data-driven neighbor interaction rules for reusable material reactions
 - Heat propagation and temperature-driven phase changes
@@ -53,6 +54,7 @@ cmake --build build
 | `6` | Fire |
 | `7` | Steam |
 | `8` | Wood |
+| `9` | Lava |
 | `0` | Eraser |
 | `C` | Clear grid |
 | `F1` | Toggle debug HUD |

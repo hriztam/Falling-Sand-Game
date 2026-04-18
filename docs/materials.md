@@ -19,9 +19,11 @@ constexpr MaterialId MAT_OIL   = 4;
 constexpr MaterialId MAT_SMOKE = 5;
 constexpr MaterialId MAT_FIRE  = 6;
 constexpr MaterialId MAT_STEAM = 7;
+constexpr MaterialId MAT_WOOD  = 8;
+constexpr MaterialId MAT_LAVA  = 9;
 ```
 
-Custom materials use IDs starting at 8. There is room for up to 65,535 distinct materials.
+Custom materials use IDs starting after the built-ins. There is room for up to 65,535 distinct materials.
 
 ## MaterialDef
 
@@ -95,6 +97,8 @@ Approximate values used in the built-ins:
 | Water | 1.0 |
 | Sand | 1.5 |
 | Wall | 999.0 |
+| Wood | 2.2 |
+| Lava | 2.8 |
 
 ### spreadFactor
 
@@ -137,6 +141,7 @@ Current examples:
 - Water turns into Steam when it gets hot enough
 - Oil turns into Fire when heated past its ignition point
 - Steam condenses back into Water when it cools
+- Lava cools into Wall once it loses enough heat
 
 ### interactionRules
 
@@ -166,7 +171,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam, and Wood. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam, Wood, and Lava. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -265,6 +270,18 @@ Steam is the first real temperature-driven phase-change material:
 
 Wood is the first structural flammable. It validates the generic contact ignition rule while still using a dedicated fire variant so it burns more slowly than Oil and emits a steadier smoke plume.
 
+### Lava (9)
+
+- Movement: `Liquid`
+- Traits: `Movable | AffectedByGravity | Displaceable | LiquidLike | ConductsHeat`
+- Density: 2.8
+- Spread: 2
+- Default temperature: very hot
+- Color: `{255, 92, 18}`
+- Heat reaction: cools into `Wall` once it drops far enough toward ambient
+
+Lava is the first dense hot liquid. It sinks through Water and Oil, continuously heats its surroundings, flashes adjacent Water into Steam, and ignites neighboring flammables through interaction rules.
+
 ## Adding a new material
 
 The entire change is one `registerMaterial()` call in `src/material_registry.cpp:buildDefaults()`. No changes to the simulation, renderer, or main loop.
@@ -276,7 +293,7 @@ The entire change is one `registerMaterial()` call in `src/material_registry.cpp
 
 {
     MaterialDef d;
-    d.id            = 8;          // MAT_ACID
+    d.id            = 10;         // MAT_ACID
     d.name          = "Acid";
     d.movementModel = MovementModel::Liquid;
     d.traits        = Trait::Movable | Trait::AffectedByGravity | Trait::Displaceable | Trait::LiquidLike;
@@ -294,7 +311,7 @@ The entire change is one `registerMaterial()` call in `src/material_registry.cpp
 Wire up a key binding in `main.cpp`:
 
 ```cpp
-case sf::Keyboard::Key::Num8: currentMat = 8; break;
+case sf::Keyboard::Key::A: currentMat = 10; break; // example only
 ```
 
 The same architecture works for non-gas materials too: acid would automatically reuse the Liquid movement family.
