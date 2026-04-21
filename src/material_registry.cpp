@@ -100,7 +100,7 @@ bool MaterialRegistry::has(MaterialId id) const
 
 // ---------------------------------------------------------------------------
 // buildDefaults — registers Empty, Sand, Water, Stone, Oil, Smoke, Fire, Steam,
-// Wood, and Lava.
+// Wood, Lava, and Ice.
 // Written with explicit field assignment for C++17 compatibility
 // (designated initialisers are C++20).
 // ---------------------------------------------------------------------------
@@ -159,6 +159,11 @@ MaterialRegistry MaterialRegistry::buildDefaults()
         d.coolingRate = 4;
         d.heatConductivity = 4;
         d.spawnState = makeSpawn(MAT_WATER);
+        d.heatReactions.push_back(
+            makeHeatReaction(std::nullopt,
+                             int8_t(-20),
+                             makeSpawn(MAT_ICE, 0, 0, -40),
+                             35));
         d.heatReactions.push_back(
             makeHeatReaction(int8_t(45),
                              std::nullopt,
@@ -477,6 +482,31 @@ MaterialRegistry MaterialRegistry::buildDefaults()
                 return;
             }
         };
+        reg.registerMaterial(std::move(d));
+    }
+
+    // --- Ice (MAT_ICE = 10) ----------------------------------------------
+    {
+        MaterialDef d;
+        d.id = MAT_ICE;
+        d.name = "Ice";
+        d.movementModel = MovementModel::Static;
+        d.traits = Trait::SolidLike | Trait::ConductsHeat;
+        d.density = 1.1f;
+        d.spreadFactor = 0;
+        d.shadeMin = 170;
+        d.shadeMax = 220;
+        d.color = {170, 225, 255, 255};
+        d.coolingRate = 0;
+        d.heatEmission = -8;
+        d.heatConductivity = 4;
+        d.spawnState = makeSpawn(MAT_ICE, 0, 0, -100);
+        d.heatReactions.push_back(
+            makeHeatReaction(int8_t(10),
+                             std::nullopt,
+                             makeSpawn(MAT_WATER, 0, 0, 0),
+                             100));
+        d.specialHook = nullptr;
         reg.registerMaterial(std::move(d));
     }
 

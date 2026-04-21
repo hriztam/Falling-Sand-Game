@@ -316,7 +316,7 @@ void Simulation::updateHeat()
                 addTemperatureDelta(x, y, cell.temperature > 0 ? -cooling : cooling);
             }
 
-            if (def->heatEmission > 0) {
+            if (def->heatEmission != 0) {
                 for (const auto& [dx, dy] : kCardinalOffsets) {
                     const int nx = x + dx;
                     const int ny = y + dy;

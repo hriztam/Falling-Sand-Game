@@ -77,7 +77,7 @@ struct MaterialDef
     uint8_t shadeMax = 128;        // inclusive upper bound
     ColorRGBA color = {};          // base RGBA used by the renderer
     uint8_t coolingRate = 0;       // how quickly temperature drifts toward ambient 0
-    uint8_t heatEmission = 0;      // heat added to each cardinal neighbour per tick
+    int8_t heatEmission = 0;       // signed heat added to each cardinal neighbour per tick
     uint8_t heatConductivity = 0;  // max heat exchanged with a neighbour per tick
     CellSpawnDesc spawnState = {}; // default state for fresh particles of this material
     std::vector<HeatReaction> heatReactions;
@@ -120,7 +120,7 @@ public:
 
     // Build the canonical set of built-in materials:
     // Empty (0), Sand (1), Water (2), Stone (3), Oil (4), Smoke (5),
-    // Fire (6), Steam (7), Wood (8), Lava (9).
+    // Fire (6), Steam (7), Wood (8), Lava (9), Ice (10).
     static MaterialRegistry buildDefaults();
 
 private:
