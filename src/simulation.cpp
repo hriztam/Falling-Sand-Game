@@ -322,7 +322,10 @@ void Simulation::updateHeat()
                     const int ny = y + dy;
                     if (!inBounds(nx, ny))
                         continue;
-                    if (m_grid[idx(nx, ny)].material == MAT_EMPTY)
+                    const Cell& neighbor = m_grid[idx(nx, ny)];
+                    if (neighbor.material == MAT_EMPTY)
+                        continue;
+                    if (neighbor.material == cell.material)
                         continue;
                     addTemperatureDelta(nx, ny, def->heatEmission);
                 }

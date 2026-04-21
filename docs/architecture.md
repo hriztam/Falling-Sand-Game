@@ -45,7 +45,7 @@ This split means you can replace SFML with SDL3 or a raw OpenGL context by rewri
 
 ### MaterialRegistry instead of a material enum
 
-The old codebase had `enum class Material { Empty, Sand, Water, Wall }` and `switch (material)` in both the renderer and the simulation. Adding a material like Oil required changes in at least three places.
+The old codebase had `enum class Material { Empty, Sand, Water, Stone }` and `switch (material)` in both the renderer and the simulation. Adding a material like Oil required changes in at least three places.
 
 The registry replaces that with a table of `MaterialDef` entries built at startup. The simulation looks up the movement model and traits from the registry at runtime. The renderer looks up the base color. Neither contains any material-specific branching — they loop over the registry or index into it by `MaterialId`.
 

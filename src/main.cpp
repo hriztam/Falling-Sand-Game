@@ -234,7 +234,7 @@ int main()
 
         switch (scene) {
         case DebugScene::OilBurn:
-            placeRect(40, 165, 220, 6, MAT_WALL);
+            placeRect(40, 165, 220, 6, MAT_STONE);
             placeRect(45, 145, 95, 18, MAT_OIL);
             placeRect(150, 125, 35, 38, MAT_WATER);
             placeRect(90, 142, 8, 3, MAT_FIRE);
@@ -242,19 +242,19 @@ int main()
             break;
 
         case DebugScene::Boiler:
-            placeRect(95, 40, 4, 120, MAT_WALL);
-            placeRect(200, 40, 4, 120, MAT_WALL);
-            placeRect(95, 160, 109, 4, MAT_WALL);
+            placeRect(95, 40, 4, 120, MAT_STONE);
+            placeRect(200, 40, 4, 120, MAT_STONE);
+            placeRect(95, 160, 109, 4, MAT_STONE);
             placeRect(99, 85, 101, 75, MAT_WATER);
             placeRect(135, 150, 28, 5, MAT_FIRE);
             currentMat = MAT_FIRE;
             break;
 
         case DebugScene::Condensation:
-            placeRect(60, 32, 4, 140, MAT_WALL);
-            placeRect(235, 32, 4, 140, MAT_WALL);
-            placeRect(60, 168, 179, 4, MAT_WALL);
-            placeRect(64, 32, 171, 4, MAT_WALL);
+            placeRect(60, 32, 4, 140, MAT_STONE);
+            placeRect(235, 32, 4, 140, MAT_STONE);
+            placeRect(60, 168, 179, 4, MAT_STONE);
+            placeRect(64, 32, 171, 4, MAT_STONE);
             placeRect(90, 120, 120, 30, MAT_WATER);
             placeRect(110, 46, 80, 28, MAT_STEAM);
             currentMat = MAT_STEAM;
@@ -280,7 +280,7 @@ int main()
             if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
                 switch (kp->code) {
                 case sf::Keyboard::Key::Num1: currentMat = MAT_SAND;  break;
-                case sf::Keyboard::Key::Num2: currentMat = MAT_WALL;  break;
+                case sf::Keyboard::Key::Num2: currentMat = MAT_STONE; break;
                 case sf::Keyboard::Key::Num3: currentMat = MAT_WATER; break;
                 case sf::Keyboard::Key::Num4: currentMat = MAT_OIL;   break;
                 case sf::Keyboard::Key::Num5: currentMat = MAT_SMOKE; break;
@@ -366,7 +366,7 @@ int main()
                 << static_cast<int>(hoveredCell.temperature) << " / "
                 << static_cast<int>(hoveredCell.life) << " / "
                 << static_cast<int>(hoveredCell.aux)
-                << "\nControls: 1 Sand 2 Wall 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 8 Wood 9 Lava 0 Erase"
+                << "\nControls: 1 Sand 2 Stone 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 8 Wood 9 Lava 0 Erase"
                 << "\nDebug: F1 HUD  F2 Heat  Space Pause  N/. Step  F5 Oil  F6 Boiler  F7 Condense  C Clear";
 
             hudText.setString(hud.str());

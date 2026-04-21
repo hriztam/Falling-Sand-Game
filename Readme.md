@@ -8,7 +8,7 @@ Each grid cell is a particle obeying simple local rules — gravity, density, an
 
 - Sand — falls, piles, sinks through water
 - Water — flows around obstacles, finds its level
-- Wall — immovable solid
+- Stone — immovable solid
 - Oil — lighter than water, so it floats while sand sinks through it
 - Smoke — rises, spreads, and dissipates over time
 - Fire — ignites flammable neighbors, emits smoke, and is extinguished by water
@@ -47,7 +47,7 @@ cmake --build build
 | Right mouse | Erase |
 | Scroll wheel | Resize brush |
 | `1` | Sand |
-| `2` | Wall |
+| `2` | Stone |
 | `3` | Water |
 | `4` | Oil |
 | `5` | Smoke |

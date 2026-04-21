@@ -14,7 +14,7 @@ Every material is identified by a `uint16_t` integer. The built-in IDs are reser
 constexpr MaterialId MAT_EMPTY = 0;
 constexpr MaterialId MAT_SAND  = 1;
 constexpr MaterialId MAT_WATER = 2;
-constexpr MaterialId MAT_WALL  = 3;
+constexpr MaterialId MAT_STONE = 3;
 constexpr MaterialId MAT_OIL   = 4;
 constexpr MaterialId MAT_SMOKE = 5;
 constexpr MaterialId MAT_FIRE  = 6;
@@ -96,7 +96,7 @@ Approximate values used in the built-ins:
 | Oil | 0.8 |
 | Water | 1.0 |
 | Sand | 1.5 |
-| Wall | 999.0 |
+| Stone | 999.0 |
 | Wood | 2.2 |
 | Lava | 2.8 |
 
@@ -141,7 +141,6 @@ Current examples:
 - Water turns into Steam when it gets hot enough
 - Oil turns into Fire when heated past its ignition point
 - Steam condenses back into Water when it cools
-- Lava cools into Wall once it loses enough heat
 
 ### interactionRules
 
@@ -171,7 +170,7 @@ const MaterialDef* getByName(const std::string&) const; // O(n), startup only
 bool              has(MaterialId id) const;
 ```
 
-At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam, Wood, and Lava. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
+At startup, `main.cpp` calls `MaterialRegistry::buildDefaults()` which returns a registry pre-loaded with Empty, Sand, Water, Stone, Oil, Smoke, Fire, Steam, Wood, and Lava. The registry is then moved into the `Simulation` constructor. After that, `sim.materials()` provides read-only access to it.
 
 ## Built-in materials
 
@@ -200,7 +199,7 @@ Sand is itself `Displaceable`, meaning a future material with density > 1.5 (lav
 
 Water is `Displaceable` with density 1.0, so denser materials automatically sink through it via `tryDisplaceByDensity`. That includes sand (density 1.5) and any future liquid denser than water.
 
-### Wall (3)
+### Stone (3)
 
 - Movement: `Static` — never moves
 - Traits: `SolidLike`
@@ -208,7 +207,7 @@ Water is `Displaceable` with density 1.0, so denser materials automatically sink
 - Shade: 100–120
 - Color: `{110, 110, 115}` — grey
 
-Nothing has a density high enough to displace a wall.
+Nothing has a density high enough to displace stone.
 
 ### Oil (4)
 
@@ -278,9 +277,9 @@ Wood is the first structural flammable. It validates the generic contact ignitio
 - Spread: 2
 - Default temperature: very hot
 - Color: `{255, 92, 18}`
-- Heat reaction: cools into `Wall` once it drops far enough toward ambient
+- Water contact turns the surface into `Stone` while boiling Water into `Steam`
 
-Lava is the first dense hot liquid. It sinks through Water and Oil, continuously heats its surroundings, flashes adjacent Water into Steam, and ignites neighboring flammables through interaction rules.
+Lava is the first dense hot liquid. It sinks through Water and Oil, continuously heats its surroundings, flashes adjacent Water into Steam, and ignites neighboring flammables through interaction rules. Once a stone crust forms, adjacent cooler lava solidifies inward as a front instead of crystallizing into random speckles.
 
 ## Adding a new material
 

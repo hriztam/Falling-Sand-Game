@@ -110,7 +110,7 @@ Priority order:
 
 Mirror of Liquid with inverted vertical direction — rises instead of falls, spreads laterally, uses `spreadFactor`. Smoke and Steam both reuse this family.
 
-### Static (Wall)
+### Static (Stone)
 
 No movement. The family function is a no-op. `specialHook` can still fire for things like heat conduction in the future.
 

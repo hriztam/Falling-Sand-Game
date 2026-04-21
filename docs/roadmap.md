@@ -31,11 +31,11 @@ Set up CMake, linked SFML 3, opened a window. Nothing moves yet.
 
 ---
 
-### v0.4 — Wall and materials
-*Commit: `added 'Wall' material`*
+### v0.4 — Stone and materials
+*Commit: `added 'Stone' material`*
 
-- Added immovable `Wall` material
-- Material selection via keyboard (1 Sand, 2 Wall)
+- Added immovable `Stone` material
+- Material selection via keyboard (1 Sand, 2 Stone)
 
 ---
 
@@ -131,7 +131,7 @@ All grid writes currently happen in-place, which means a particle moved early in
 **Lava**
 - Dense, slow-spreading liquid (`Liquid`, low `spreadFactor`, high `density`)
 - Destroys `Flammable` cells on contact (via `specialHook`)
-- Cools to `Wall` when adjacent to Water (temperature interaction)
+- Cools to `Stone` when adjacent to Water (temperature interaction)
 
 **Plants / Organic growth**
 - `Organic` movement model, fully hook-driven

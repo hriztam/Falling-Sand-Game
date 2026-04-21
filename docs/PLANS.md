@@ -16,7 +16,7 @@ All infrastructure already exists. These are pure `registerMaterial()` calls wit
 
 | Material    | Model   | Key behavior |
 |-------------|---------|--------------|
-| **Lava**    | Liquid  | High `heatEmission`, cools to Wall (via heat reaction) when temp drops, destroys Flammable neighbors, boils Water to Steam |
+| **Lava**    | Liquid  | High `heatEmission`, forms Stone on Water contact, solidifies inward as it cools, destroys Flammable neighbors, boils Water to Steam |
 | **Ice**     | Static  | Freezes adjacent Water cells when cold (`temperature` field is ready), melts to Water via heat reaction |
 | **Wood**    | Static  | `Flammable` trait, burns slowly (long `life`), emits Smoke; enable tree/structure building |
 | **Gunpowder** | Powder | `Flammable`, explodes (fast fire burst) when ignited — needs a multi-cell spawn helper |

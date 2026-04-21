@@ -6,7 +6,7 @@
 namespace
 {
     constexpr uint8_t FIRE_AUX_NONE = 0;
-    constexpr uint8_t FIRE_AUX_OIL  = 1;
+    constexpr uint8_t FIRE_AUX_OIL = 1;
     constexpr uint8_t FIRE_AUX_WOOD = 2;
 
     CellSpawnDesc makeSpawn(MaterialId material,
@@ -99,7 +99,7 @@ bool MaterialRegistry::has(MaterialId id) const
 }
 
 // ---------------------------------------------------------------------------
-// buildDefaults — registers Empty, Sand, Water, Wall, Oil, Smoke, Fire, Steam,
+// buildDefaults — registers Empty, Sand, Water, Stone, Oil, Smoke, Fire, Steam,
 // Wood, and Lava.
 // Written with explicit field assignment for C++17 compatibility
 // (designated initialisers are C++20).
@@ -168,11 +168,11 @@ MaterialRegistry MaterialRegistry::buildDefaults()
         reg.registerMaterial(std::move(d));
     }
 
-    // --- Wall (MAT_WALL = 3) ---------------------------------------------
+    // --- Stone (MAT_STONE = 3) -------------------------------------------
     {
         MaterialDef d;
-        d.id = MAT_WALL;
-        d.name = "Wall";
+        d.id = MAT_STONE;
+        d.name = "Stone";
         d.movementModel = MovementModel::Static;
         d.traits = Trait::SolidLike;
         d.density = 999.f;
@@ -182,7 +182,7 @@ MaterialRegistry MaterialRegistry::buildDefaults()
         d.color = {110, 110, 115, 255};
         d.coolingRate = 1;
         d.heatConductivity = 3;
-        d.spawnState = makeSpawn(MAT_WALL);
+        d.spawnState = makeSpawn(MAT_STONE);
         d.specialHook = nullptr;
         reg.registerMaterial(std::move(d));
     }
@@ -318,7 +318,8 @@ MaterialRegistry MaterialRegistry::buildDefaults()
                 sim.getCell(x, y - 1).material == MAT_EMPTY)
             {
                 const int smokeChance = isWoodFire ? 18 : 35;
-                if ((std::rand() % 100) < smokeChance) {
+                if ((std::rand() % 100) < smokeChance)
+                {
                     const uint8_t smokeLifeMin = isWoodFire ? 18 : 12;
                     const uint8_t smokeLifeMax = isWoodFire ? 32 : 24;
                     sim.spawnInto(x, y - 1, makeSpawn(MAT_SMOKE, smokeLifeMin, smokeLifeMax, 35), true);
@@ -397,15 +398,10 @@ MaterialRegistry MaterialRegistry::buildDefaults()
         d.shadeMin = 150;
         d.shadeMax = 220;
         d.color = {255, 92, 18, 255};
-        d.coolingRate = 1;
+        d.coolingRate = 0;
         d.heatEmission = 18;
         d.heatConductivity = 5;
         d.spawnState = makeSpawn(MAT_LAVA, 0, 0, 120);
-        d.heatReactions.push_back(
-            makeHeatReaction(std::nullopt,
-                             int8_t(18),
-                             makeSpawn(MAT_WALL, 0, 0, 0),
-                             100));
 
         {
             InteractionRule rule;
@@ -413,6 +409,7 @@ MaterialRegistry MaterialRegistry::buildDefaults()
             rule.neighborhood = InteractionNeighborhood::Cardinal;
             rule.chancePercent = 100;
             rule.stopAfterApply = true;
+            rule.selfResult = makeSpawn(MAT_STONE, 0, 0, 0);
             rule.neighborResult = makeSpawn(MAT_STEAM, 0, 0, 95);
             d.interactionRules.push_back(rule);
         }
@@ -447,7 +444,39 @@ MaterialRegistry MaterialRegistry::buildDefaults()
             d.interactionRules.push_back(rule);
         }
 
-        d.specialHook = nullptr;
+        d.specialHook = [](Simulation &sim, int x, int y)
+        {
+            const Cell lava = sim.getCell(x, y);
+            if (lava.material != MAT_LAVA)
+                return;
+
+            static constexpr int kCardinalOffsets[4][2] = {
+                {0, -1},
+                {1, 0},
+                {0, 1},
+                {-1, 0},
+            };
+
+            bool touchesStone = false;
+            for (const auto &offset : kCardinalOffsets)
+            {
+                const Cell neighbor = sim.getCell(x + offset[0], y + offset[1]);
+                if (neighbor.material == MAT_STONE)
+                {
+                    touchesStone = true;
+                    break;
+                }
+            }
+
+            // Water contact nucleates a stone crust through the interaction
+            // rule above; once a crust exists, adjacent cool lava solidifies
+            // inward as a front rather than as random speckles.
+            if (touchesStone && lava.temperature <= 55)
+            {
+                sim.spawnInto(x, y, makeSpawn(MAT_STONE, 0, 0, 0), true);
+                return;
+            }
+        };
         reg.registerMaterial(std::move(d));
     }
 

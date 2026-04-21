@@ -9,47 +9,53 @@
 // without creating a circular include.
 class Simulation;
 
-enum class InteractionNeighborhood : uint8_t {
+enum class InteractionNeighborhood : uint8_t
+{
     Cardinal = 0, // up, down, left, right
-    Moore    = 1, // cardinal + diagonals
+    Moore = 1,    // cardinal + diagonals
 };
 
-enum class ShadeMode : uint8_t {
+enum class ShadeMode : uint8_t
+{
     Randomized = 0,
-    Preserve   = 1,
-    Fixed      = 2,
+    Preserve = 1,
+    Fixed = 2,
 };
 
-struct MaterialMatch {
+struct MaterialMatch
+{
     std::optional<MaterialId> material;
-    uint16_t                  requiredTraits  = 0;
-    uint16_t                  forbiddenTraits = 0;
+    uint16_t requiredTraits = 0;
+    uint16_t forbiddenTraits = 0;
 };
 
-struct CellSpawnDesc {
-    MaterialId material    = MAT_EMPTY;
-    uint8_t    lifeMin     = 0;
-    uint8_t    lifeMax     = 0;
-    int8_t     temperature = 0;
-    uint8_t    aux         = 0;
-    ShadeMode  shadeMode   = ShadeMode::Randomized;
-    uint8_t    shade       = 128;
+struct CellSpawnDesc
+{
+    MaterialId material = MAT_EMPTY;
+    uint8_t lifeMin = 0;
+    uint8_t lifeMax = 0;
+    int8_t temperature = 0;
+    uint8_t aux = 0;
+    ShadeMode shadeMode = ShadeMode::Randomized;
+    uint8_t shade = 128;
 };
 
-struct InteractionRule {
-    MaterialMatch                     neighbor;
-    InteractionNeighborhood          neighborhood  = InteractionNeighborhood::Cardinal;
-    uint8_t                          chancePercent = 100;
-    bool                             stopAfterApply = true;
-    std::optional<CellSpawnDesc>     selfResult;
-    std::optional<CellSpawnDesc>     neighborResult;
+struct InteractionRule
+{
+    MaterialMatch neighbor;
+    InteractionNeighborhood neighborhood = InteractionNeighborhood::Cardinal;
+    uint8_t chancePercent = 100;
+    bool stopAfterApply = true;
+    std::optional<CellSpawnDesc> selfResult;
+    std::optional<CellSpawnDesc> neighborResult;
 };
 
-struct HeatReaction {
-    std::optional<int8_t>        minTemperature;
-    std::optional<int8_t>        maxTemperature;
-    uint8_t                      chancePercent = 100;
-    bool                         stopAfterApply = true;
+struct HeatReaction
+{
+    std::optional<int8_t> minTemperature;
+    std::optional<int8_t> maxTemperature;
+    uint8_t chancePercent = 100;
+    bool stopAfterApply = true;
     std::optional<CellSpawnDesc> selfResult;
 };
 
@@ -59,20 +65,21 @@ struct HeatReaction {
 // "material classes" here means registry definitions, not heap-allocated
 // polymorphic objects per particle.
 // ---------------------------------------------------------------------------
-struct MaterialDef {
-    MaterialId    id            = MAT_EMPTY;
-    std::string   name;
+struct MaterialDef
+{
+    MaterialId id = MAT_EMPTY;
+    std::string name;
     MovementModel movementModel = MovementModel::Empty;
-    uint16_t      traits        = 0;          // bitfield of Trait:: constants
-    float         density       = 0.f;        // higher density sinks through lower
-    int           spreadFactor  = 0;          // lateral spread limit for Liquid/Gas
-    uint8_t       shadeMin      = 128;        // inclusive lower bound for shade randomisation
-    uint8_t       shadeMax      = 128;        // inclusive upper bound
-    ColorRGBA     color         = {};         // base RGBA used by the renderer
-    uint8_t       coolingRate   = 0;          // how quickly temperature drifts toward ambient 0
-    uint8_t       heatEmission  = 0;          // heat added to each cardinal neighbour per tick
-    uint8_t       heatConductivity = 0;       // max heat exchanged with a neighbour per tick
-    CellSpawnDesc spawnState    = {};         // default state for fresh particles of this material
+    uint16_t traits = 0;           // bitfield of Trait:: constants
+    float density = 0.f;           // higher density sinks through lower
+    int spreadFactor = 0;          // lateral spread limit for Liquid/Gas
+    uint8_t shadeMin = 128;        // inclusive lower bound for shade randomisation
+    uint8_t shadeMax = 128;        // inclusive upper bound
+    ColorRGBA color = {};          // base RGBA used by the renderer
+    uint8_t coolingRate = 0;       // how quickly temperature drifts toward ambient 0
+    uint8_t heatEmission = 0;      // heat added to each cardinal neighbour per tick
+    uint8_t heatConductivity = 0;  // max heat exchanged with a neighbour per tick
+    CellSpawnDesc spawnState = {}; // default state for fresh particles of this material
     std::vector<HeatReaction> heatReactions;
     std::vector<InteractionRule> interactionRules;
 
@@ -80,14 +87,15 @@ struct MaterialDef {
     // interaction rules.
     // Null means no special behaviour beyond the movement model.
     // Signature: (Simulation& sim, int x, int y)
-    std::function<void(Simulation&, int, int)> specialHook;
+    std::function<void(Simulation &, int, int)> specialHook;
 };
 
 // ---------------------------------------------------------------------------
 // MaterialRegistry — owns all MaterialDef entries, looked up by MaterialId
 // in O(1) via direct vector indexing.
 // ---------------------------------------------------------------------------
-class MaterialRegistry {
+class MaterialRegistry
+{
 public:
     MaterialRegistry() = default;
 
@@ -96,10 +104,10 @@ public:
     void registerMaterial(MaterialDef def);
 
     // Look up by id — returns nullptr if no material is registered for id.
-    [[nodiscard]] const MaterialDef* get(MaterialId id) const;
+    [[nodiscard]] const MaterialDef *get(MaterialId id) const;
 
     // Look up by name — O(n) linear scan, call only at startup / UI time.
-    [[nodiscard]] const MaterialDef* getByName(const std::string& name) const;
+    [[nodiscard]] const MaterialDef *getByName(const std::string &name) const;
 
     // True if a MaterialDef for id has been registered.
     [[nodiscard]] bool has(MaterialId id) const;
@@ -108,10 +116,10 @@ public:
     [[nodiscard]] std::size_t slotCount() const { return m_defs.size(); }
 
     // Full list for iteration (renderer, debug UI, etc.).
-    [[nodiscard]] const std::vector<MaterialDef>& all() const { return m_defs; }
+    [[nodiscard]] const std::vector<MaterialDef> &all() const { return m_defs; }
 
     // Build the canonical set of built-in materials:
-    // Empty (0), Sand (1), Water (2), Wall (3), Oil (4), Smoke (5),
+    // Empty (0), Sand (1), Water (2), Stone (3), Oil (4), Smoke (5),
     // Fire (6), Steam (7), Wood (8), Lava (9).
     static MaterialRegistry buildDefaults();
 

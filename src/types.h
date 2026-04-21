@@ -20,7 +20,7 @@ using MaterialId = uint16_t;
 constexpr MaterialId MAT_EMPTY = 0;
 constexpr MaterialId MAT_SAND  = 1;
 constexpr MaterialId MAT_WATER = 2;
-constexpr MaterialId MAT_WALL  = 3;
+constexpr MaterialId MAT_STONE = 3;
 constexpr MaterialId MAT_OIL   = 4;
 constexpr MaterialId MAT_SMOKE = 5;
 constexpr MaterialId MAT_FIRE  = 6;
@@ -33,7 +33,7 @@ constexpr MaterialId MAT_LAVA  = 9;
 // ---------------------------------------------------------------------------
 enum class MovementModel : uint8_t {
     Empty   = 0,  // void / air — never processed
-    Static  = 1,  // immovable solid (wall)
+    Static  = 1,  // immovable solid (stone)
     Powder  = 2,  // falls and slides diagonally (sand)
     Liquid  = 3,  // falls and spreads laterally (water)
     Gas     = 4,  // rises and spreads laterally (smoke)
