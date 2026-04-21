@@ -120,7 +120,7 @@ public:
 
     // Build the canonical set of built-in materials:
     // Empty (0), Sand (1), Water (2), Stone (3), Oil (4), Smoke (5),
-    // Fire (6), Steam (7), Wood (8), Lava (9), Ice (10).
+    // Fire (6), Steam (7), Wood (8), Lava (9), Ice (10), Acid (11).
     static MaterialRegistry buildDefaults();
 
 private:

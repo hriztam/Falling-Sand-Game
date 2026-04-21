@@ -130,6 +130,7 @@ int main()
         Boiler,
         Condensation,
         Freezing,
+        Corrosion,
     };
 
     std::srand(static_cast<unsigned>(std::time(nullptr)));
@@ -216,6 +217,7 @@ int main()
         case DebugScene::Boiler:      return "Boiler";
         case DebugScene::Condensation:return "Condensation";
         case DebugScene::Freezing:    return "Freezing";
+        case DebugScene::Corrosion:   return "Corrosion";
         default:                      return "Custom";
         }
     };
@@ -271,6 +273,16 @@ int main()
             currentMat = MAT_ICE;
             break;
 
+        case DebugScene::Corrosion:
+            placeRect(60, 165, 180, 5, MAT_STONE);
+            placeRect(85, 105, 20, 60, MAT_STONE);
+            placeRect(110, 125, 35, 18, MAT_WOOD);
+            placeRect(150, 116, 28, 10, MAT_ICE);
+            placeRect(185, 90, 18, 75, MAT_STONE);
+            placeRect(100, 78, 95, 18, MAT_ACID);
+            currentMat = MAT_ACID;
+            break;
+
         default:
             break;
         }
@@ -300,6 +312,7 @@ int main()
                 case sf::Keyboard::Key::Num8: currentMat = MAT_WOOD;  break;
                 case sf::Keyboard::Key::Num9: currentMat = MAT_LAVA;  break;
                 case sf::Keyboard::Key::Num0: currentMat = MAT_EMPTY; break;
+                case sf::Keyboard::Key::A:    currentMat = MAT_ACID;  break;
                 case sf::Keyboard::Key::I:    currentMat = MAT_ICE;   break;
                 case sf::Keyboard::Key::C:    sim.clear(); activeScene = DebugScene::None; break;
                 case sf::Keyboard::Key::F1:   debugHudEnabled = !debugHudEnabled; break;
@@ -311,6 +324,7 @@ int main()
                 case sf::Keyboard::Key::F6:   loadScene(DebugScene::Boiler); break;
                 case sf::Keyboard::Key::F7:   loadScene(DebugScene::Condensation); break;
                 case sf::Keyboard::Key::F8:   loadScene(DebugScene::Freezing); break;
+                case sf::Keyboard::Key::F9:   loadScene(DebugScene::Corrosion); break;
                 default: break;
                 }
             }
@@ -379,8 +393,8 @@ int main()
                 << static_cast<int>(hoveredCell.temperature) << " / "
                 << static_cast<int>(hoveredCell.life) << " / "
                 << static_cast<int>(hoveredCell.aux)
-                << "\nControls: 1 Sand 2 Stone 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 8 Wood 9 Lava I Ice 0 Erase"
-                << "\nDebug: F1 HUD  F2 Heat  Space Pause  N/. Step  F5 Oil  F6 Boiler  F7 Condense  F8 Freeze  C Clear";
+                << "\nControls: 1 Sand 2 Stone 3 Water 4 Oil 5 Smoke 6 Fire 7 Steam 8 Wood 9 Lava I Ice A Acid 0 Erase"
+                << "\nDebug: F1 HUD  F2 Heat  Space Pause  N/. Step  F5 Oil  F6 Boiler  F7 Condense  F8 Freeze  F9 Acid  C Clear";
 
             hudText.setString(hud.str());
 

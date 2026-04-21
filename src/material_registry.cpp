@@ -8,6 +8,12 @@ namespace
     constexpr uint8_t FIRE_AUX_NONE = 0;
     constexpr uint8_t FIRE_AUX_OIL = 1;
     constexpr uint8_t FIRE_AUX_WOOD = 2;
+    constexpr int kCardinalOffsets[4][2] = {
+        {0, -1},
+        {1, 0},
+        {0, 1},
+        {-1, 0},
+    };
 
     CellSpawnDesc makeSpawn(MaterialId material,
                             uint8_t lifeMin = 0,
@@ -100,7 +106,7 @@ bool MaterialRegistry::has(MaterialId id) const
 
 // ---------------------------------------------------------------------------
 // buildDefaults — registers Empty, Sand, Water, Stone, Oil, Smoke, Fire, Steam,
-// Wood, Lava, and Ice.
+// Wood, Lava, Ice, and Acid.
 // Written with explicit field assignment for C++17 compatibility
 // (designated initialisers are C++20).
 // ---------------------------------------------------------------------------
@@ -507,6 +513,53 @@ MaterialRegistry MaterialRegistry::buildDefaults()
                              makeSpawn(MAT_WATER, 0, 0, 0),
                              100));
         d.specialHook = nullptr;
+        reg.registerMaterial(std::move(d));
+    }
+
+    // --- Acid (MAT_ACID = 11) --------------------------------------------
+    {
+        MaterialDef d;
+        d.id = MAT_ACID;
+        d.name = "Acid";
+        d.movementModel = MovementModel::Liquid;
+        d.traits = Trait::Movable | Trait::AffectedByGravity | Trait::Displaceable | Trait::LiquidLike;
+        d.density = 1.15f;
+        d.spreadFactor = 4;
+        d.shadeMin = 105;
+        d.shadeMax = 150;
+        d.color = {85, 230, 90, 255};
+        d.coolingRate = 2;
+        d.heatConductivity = 1;
+        d.spawnState = makeSpawn(MAT_ACID);
+        d.specialHook = [](Simulation &sim, int x, int y)
+        {
+            const Cell acid = sim.getCell(x, y);
+            if (acid.material != MAT_ACID)
+                return;
+
+            const int start = std::rand() % 4;
+            for (int i = 0; i < 4; ++i)
+            {
+                const int *offset = kCardinalOffsets[(start + i) % 4];
+                const int nx = x + offset[0];
+                const int ny = y + offset[1];
+                const Cell neighbor = sim.getCell(nx, ny);
+                if (neighbor.material == MAT_EMPTY)
+                    continue;
+
+                const MaterialDef *neighborDef = sim.materials().get(neighbor.material);
+                if (!neighborDef || !(neighborDef->traits & Trait::SolidLike))
+                    continue;
+
+                if ((std::rand() % 100) >= 22)
+                    return;
+
+                sim.spawnInto(nx, ny, MAT_EMPTY);
+                if ((std::rand() % 100) < 35)
+                    sim.spawnInto(x, y, MAT_EMPTY);
+                return;
+            }
+        };
         reg.registerMaterial(std::move(d));
     }
 

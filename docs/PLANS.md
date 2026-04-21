@@ -9,23 +9,24 @@
 All infrastructure already exists. These are pure `registerMaterial()` calls with minimal new code.
 
 ### 1.1 Generic Flammable ignition rule
+- Status: done
 - Fire should spread to **any** cell with the `Flammable` trait via an `interactionRule` on Fire, not hardcoded per-material.
 - Right now Oil ignites only through the heat reaction path. Adding `Flammable` → catch-fire interaction makes the system composable.
 
 ### 1.2 New materials
 
-| Material    | Model   | Key behavior |
-|-------------|---------|--------------|
-| **Lava**    | Liquid  | High `heatEmission`, forms Stone on Water contact, solidifies inward as it cools, destroys Flammable neighbors, boils Water to Steam |
-| **Ice**     | Static  | Freezes adjacent Water cells when cold (`temperature` field is ready), melts to Water via heat reaction |
-| **Wood**    | Static  | `Flammable` trait, burns slowly (long `life`), emits Smoke; enable tree/structure building |
-| **Gunpowder** | Powder | `Flammable`, explodes (fast fire burst) when ignited — needs a multi-cell spawn helper |
-| **Acid**    | Liquid  | `specialHook` that dissolves `SolidLike` neighbors via `spawnInto(neighbor, MAT_EMPTY)` with probability |
-| **Dirt**    | Powder  | Lower density than Sand, absorbs Water (Water converts to Mud) |
-| **Mud**     | Powder  | Heavier/stickier than dirt; hardens to Dirt/Stone when hot |
-| **Stone**   | Static  | High-conductivity solid; base terrain material |
-| **Metal**   | Static  | Very high `heatConductivity`, non-flammable, conducts electricity (future) |
-| **TNT**     | Static  | Explodes in a radius when ignited — needs explosion helper |
+| Material    | Model   | Status | Key behavior |
+|-------------|---------|--------|--------------|
+| **Lava**    | Liquid  | Done | High `heatEmission`, forms Stone on Water contact, solidifies inward as it cools, destroys Flammable neighbors, boils Water to Steam |
+| **Ice**     | Static  | Done | Freezes adjacent Water cells when cold (`temperature` field is ready), melts to Water via heat reaction |
+| **Wood**    | Static  | Done | `Flammable` trait, burns slowly (long `life`), emits Smoke; enable tree/structure building |
+| **Gunpowder** | Powder | Pending | `Flammable`, explodes (fast fire burst) when ignited — needs a multi-cell spawn helper |
+| **Acid**    | Liquid  | Done | `specialHook` that dissolves `SolidLike` neighbors via `spawnInto(neighbor, MAT_EMPTY)` with probability |
+| **Dirt**    | Powder  | Pending | Lower density than Sand, absorbs Water (Water converts to Mud) |
+| **Mud**     | Powder  | Pending | Heavier/stickier than dirt; hardens to Dirt/Stone when hot |
+| **Stone**   | Static  | Done | High-conductivity solid; base terrain material |
+| **Metal**   | Static  | Pending | Very high `heatConductivity`, non-flammable, conducts electricity (future) |
+| **TNT**     | Static  | Pending | Explodes in a radius when ignited — needs explosion helper |
 
 ### 1.3 Explosion helper
 - Add a `Simulation::explode(x, y, radius, force)` method that clears cells in a radius and spawns Fire/shockwave.
@@ -144,14 +145,13 @@ All infrastructure already exists. These are pure `registerMaterial()` calls wit
 
 ## Immediate Next Actions (Prioritized)
 
-1. **Add generic Flammable ignition rule** — 30 min, pure data change in `material_registry.cpp`
-2. **Add Wood, Lava, Ice** — 2–3 hours, tests the heat + interaction system end-to-end
-3. **Add Gunpowder + explosion helper** — 2 hours, first "destructive" mechanic
-4. **Dirty-rect chunk optimization** — half a day, unlocks bigger worlds without frame drops
-5. **Add Acid** — 1 hour, first "dissolving" mechanic, feels very satisfying
-6. **Chunked world + camera** — 1–2 days, needed before world gen makes sense
-7. **Procedural world gen** — 1–2 days, makes the sandbox feel like a world
-8. **Player entity + platformer movement** — 2–3 days, first step toward a real game
+1. **Add Gunpowder + explosion helper** — 2 hours, first "destructive" mechanic
+2. **Dirty-rect chunk optimization** — half a day, unlocks bigger worlds without frame drops
+3. **Wire up `ConductsHeat` trait** — small cleanup, remove dead flag state now that more materials use heat
+4. **Add Dirt + Mud** — 1–2 hours, first absorption / wet-material chain
+5. **Chunked world + camera** — 1–2 days, needed before world gen makes sense
+6. **Procedural world gen** — 1–2 days, makes the sandbox feel like a world
+7. **Player entity + platformer movement** — 2–3 days, first step toward a real game
 
 ---
 
